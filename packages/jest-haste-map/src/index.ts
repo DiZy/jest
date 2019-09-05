@@ -14,7 +14,6 @@ import * as path from 'path';
 import {NodeWatcher, Watcher as SaneWatcher} from 'sane';
 import invariant = require('invariant');
 import {Config} from '@jest/types';
-import serializer from 'jest-serializer';
 import Worker from 'jest-worker';
 import {getSha1, worker} from './worker';
 import getMockName from './getMockName';
@@ -46,6 +45,7 @@ import {
   ModuleMetaData,
   WorkerMetadata,
 } from './types';
+import persistence from './persistence/persistence';
 
 type HType = typeof H;
 
@@ -330,7 +330,11 @@ class HasteMap extends EventEmitter {
     const hash = createHash('md5').update(extra.join(''));
     return path.join(
       tmpdir,
-      name.replace(/\W/g, '-') + '-' + hash.digest('hex'),
+      [
+        name.replace(/\W/g, '-'),
+        hash.digest('hex'),
+        persistence.getType(),
+      ].join('-'),
     );
   }
 
@@ -352,7 +356,7 @@ class HasteMap extends EventEmitter {
           data.removedFiles.size > 0
         ) {
           hasteMap = await this._buildHasteMap(data);
-          this._persist(hasteMap);
+          this._persist(hasteMap, data.removedFiles, data.changedFiles);
         } else {
           hasteMap = data.hasteMap;
         }
@@ -388,7 +392,7 @@ class HasteMap extends EventEmitter {
     let hasteMap: InternalHasteMap;
 
     try {
-      hasteMap = serializer.readFileSync(this._cachePath);
+      hasteMap = persistence.read(this._cachePath);
     } catch (err) {
       hasteMap = this._createEmptyMap();
     }
@@ -715,8 +719,11 @@ class HasteMap extends EventEmitter {
   /**
    * 4. serialize the new `HasteMap` in a cache file.
    */
-  private _persist(hasteMap: InternalHasteMap) {
-    serializer.writeFileSync(this._cachePath, hasteMap);
+  private _persist(
+    hasteMap: InternalHasteMap,
+    removedFiles: FileData,
+    changedFiles?: FileData,) {
+    persistence.write(this._cachePath, hasteMap, removedFiles, changedFiles);
   }
 
   /**

@@ -84,7 +84,7 @@ export type RawModuleMap = {
   mocks: MockData;
 };
 
-type ModuleMapItem = {[platform: string]: ModuleMetaData};
+export type ModuleMapItem = {[platform: string]: ModuleMetaData};
 export type ModuleMetaData = [Config.Path, /* type */ number];
 
 export type HType = {
@@ -101,6 +101,8 @@ export type HType = {
   GENERIC_PLATFORM: 'g';
   NATIVE_PLATFORM: 'native';
   DEPENDENCY_DELIM: '\0';
+  IOS_PLATFORM: 'ios';
+  ANDROID_PLATFORM: 'android';
 };
 
 export type HTypeValue = HType[keyof HType];
@@ -116,3 +118,14 @@ export type ChangeEvent = {
   hasteFS: HasteFS;
   moduleMap: ModuleMap;
 };
+
+export interface Persistence {
+  write(
+    cachePath: string,
+    internalHasteMap: InternalHasteMap,
+    removedFiles: FileData, // Always tracked.
+    changedFiles?: FileData, // Only tracked with Watchman.
+  ): void;
+  read(cachePath: string): InternalHasteMap;
+  getType(): string;
+}
