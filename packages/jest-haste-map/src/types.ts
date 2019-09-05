@@ -129,3 +129,8 @@ export interface Persistence {
   read(cachePath: string): InternalHasteMap;
   getType(): string;
 }
+
+export interface QueryablePersistence extends Persistence {
+  getFileData(filePath: string, cachePath: string): FileMetaData;
+  findFilePathsBasedOnPattern(pattern: RegExp | string, cachePath: string): Array<string>;
+}

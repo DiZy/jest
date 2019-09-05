@@ -19,7 +19,7 @@ import {getSha1, worker} from './worker';
 import getMockName from './getMockName';
 import getPlatformExtension from './lib/getPlatformExtension';
 import H from './constants';
-import HasteFS from './HasteFS';
+import DefaultHasteFS from './DefaultHasteFS';
 import HasteModuleMap, {
   SerializableModuleMap as HasteSerializableModuleMap,
 } from './ModuleMap';
@@ -46,6 +46,7 @@ import {
   WorkerMetadata,
 } from './types';
 import persistence from './persistence/persistence';
+import HasteFS from './HasteFS';
 
 type HType = typeof H;
 
@@ -362,7 +363,7 @@ class HasteMap extends EventEmitter {
         }
 
         const rootDir = this._options.rootDir;
-        const hasteFS = new HasteFS({
+        const hasteFS = new DefaultHasteFS({
           files: hasteMap.files,
           rootDir,
         });
@@ -849,7 +850,7 @@ class HasteMap extends EventEmitter {
         mustCopy = true;
         const changeEvent: ChangeEvent = {
           eventsQueue,
-          hasteFS: new HasteFS({
+          hasteFS: new DefaultHasteFS({
             files: hasteMap.files,
             rootDir,
           }),
