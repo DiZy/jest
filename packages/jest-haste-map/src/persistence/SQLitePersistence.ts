@@ -3,14 +3,42 @@ import * as fs from 'fs';
 import betterSqlLite3 from 'better-sqlite3';
 import {
   InternalHasteMap,
-  Persistence,
+  QueryablePersistence,
   FileData,
   FileMetaData,
   ModuleMapItem,
 } from '../types';
 import H from '../constants';
 
-class SQLitePersistence implements Persistence {
+class SQLitePersistence implements QueryablePersistence {
+  findFilePathsBasedOnPattern(pattern: string | RegExp, cachePath: string): Array<string> {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath, true);
+
+    // Fetch files.
+    const filesArr: Array<string> = db.prepare(`SELECT filePath FROM files where filePath regexp ?`).all(pattern);
+
+    return filesArr;
+  }
+  
+  getFileData(filePath: string, cachePath: string): FileMetaData {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath, true);
+
+    // Fetch files.
+    const file: {
+      filePath: string;
+      id: string;
+      mtime: number;
+      size: number;
+      visited: 0 | 1;
+      dependencies: string;
+      sha1: string;
+    } = db.prepare(`SELECT * FROM files WHERE filePath=?`).get(filePath);
+
+    return [file.id, file.mtime, file.size, file.visited, file.dependencies, file.sha1];
+  }
+
   read(cachePath: string): InternalHasteMap {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
