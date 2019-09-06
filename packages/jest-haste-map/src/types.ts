@@ -118,19 +118,32 @@ export type ChangeEvent = {
   moduleMap: ModuleMap;
 };
 
+export type ChangedFileMetadata = {
+  mtime: number,
+  size: number,
+  sha1: string | null | undefined,
+};
+
 export type FileCrawlData = {
   removedFiles: Set<Config.Path>,
-  changedFiles: FileData,
+  changedFiles: Map<Config.Path, ChangedFileMetadata>, // Contains only new information
   isFresh: boolean,
-}
+};
+
+export type FilePersistenceData = {
+  removedFiles: Set<Config.Path>,
+  changedFiles: FileData, // Contains final data to persist
+  isFresh: boolean,
+};
 
 export interface Persistence {
-  write(
+  writeFileData(cachePath: string, data: FileCrawlData): FilePersistenceData
+  writeInternalHasteMap(
     cachePath: string,
     internalHasteMap: InternalHasteMap,
-    data: FileCrawlData,
+    fileData: FilePersistenceData,
   ): void;
   readInternalHasteMap(cachePath: string): InternalHasteMap;
   readAllFiles(cachePath: string): FileData;
   getType(): string;
-}
+};

@@ -13,9 +13,9 @@ import normalizePathSep from '../lib/normalizePathSep';
 
 import {
   CrawlerOptions,
-  FileMetaData,
   InternalHasteMap,
   FileCrawlData,
+  ChangedFileMetadata,
 } from '../types';
 
 type WatchmanRoots = Map<string, Array<string>>;
@@ -189,7 +189,7 @@ export = async function watchmanCrawl(
           sha1hex = null;
         }
 
-        let nextData: FileMetaData = ['', mtime, size, 0, '', sha1hex];
+        let changedFileMetadata: ChangedFileMetadata = {mtime, size, sha1: sha1hex};
 
         const mappings = options.mapper ? options.mapper(filePath) : null;
 
@@ -200,11 +200,11 @@ export = async function watchmanCrawl(
                 rootDir,
                 absoluteVirtualFilePath,
               );
-              changedFiles.set(relativeVirtualFilePath, nextData);
+              changedFiles.set(relativeVirtualFilePath, changedFileMetadata);
             }
           }
         } else {
-          changedFiles.set(relativeFilePath, nextData);
+          changedFiles.set(relativeFilePath, changedFileMetadata);
         }
       }
     }

@@ -8,7 +8,7 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileMetaData} from './types';
+import {FileMetaData, FileCrawlData, FilePersistenceData} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
@@ -21,6 +21,10 @@ export default class SQLHasteFS implements HasteFS {
   constructor(rootDir: Config.Path, cachePath: Config.Path) {
     this._rootDir = rootDir;
     this._cachePath = cachePath;
+  }
+
+  persistFileData(fileCrawlData: FileCrawlData): FilePersistenceData {
+    return SQLitePersistence.writeFileData(this._cachePath, fileCrawlData);
   }
 
   getModuleName(file: Config.Path): string | null {

@@ -45,6 +45,7 @@ import {
   ModuleMetaData,
   WorkerMetadata,
   FileCrawlData,
+  FilePersistenceData,
 } from './types';
 import persistence from './persistence/persistence';
 import HasteFS from './HasteFS';
@@ -359,10 +360,11 @@ class HasteMap extends EventEmitter {
         if (persistence.getType() === 'sqlite') {
           hasteFS = new SQLHasteFS(rootDir, this._cachePath);
         } else {
-          let allFiles = persistence.readAllFiles(this._cachePath);
+          let existingFiles = persistence.readAllFiles(this._cachePath);
           hasteFS = new DefaultHasteFS({
-            files: allFiles,
+            files: existingFiles,
             rootDir,
+            cachePath: this._cachePath,
           });
         }
 
@@ -373,8 +375,9 @@ class HasteMap extends EventEmitter {
           data.changedFiles.size > 0 ||
           data.removedFiles.size > 0
         ) {
-          hasteMap = await this._buildHasteMap(hasteMap, hasteFS, data);
-          this._persist(hasteMap, data);
+          const filePersistenceData = hasteFS.persistFileData(data);
+          hasteMap = await this._buildHasteMap(hasteMap, hasteFS, filePersistenceData);
+          persistence.writeInternalHasteMap(this._cachePath, hasteMap, filePersistenceData);
         }
 
         const moduleMap = new HasteModuleMap({
@@ -656,14 +659,14 @@ class HasteMap extends EventEmitter {
       .then(workerReply, workerError);
   }
 
-  private _buildHasteMap(hasteMap: InternalHasteMap, hasteFS: HasteFS, data: FileCrawlData): Promise<InternalHasteMap> {
+  private _buildHasteMap(hasteMap: InternalHasteMap, hasteFS: HasteFS, data: FilePersistenceData): Promise<InternalHasteMap> {
     const {removedFiles, changedFiles} = data;
 
     // If any files were removed or we did not track what files changed, process
     // every file looking for changes. Otherwise, process only changed files.
     let map: ModuleMapData = hasteMap.map;
     let mocks: MockData = hasteMap.mocks;
-    let filesToProcess: FileData = changedFiles;
+    let filesToProcess: FileData = changedFiles
 
     for (const [relativeFilePath] of removedFiles) {
       const fileMetadata = hasteFS.getFileMetadata(relativeFilePath);
@@ -715,15 +718,6 @@ class HasteMap extends EventEmitter {
     }
 
     this._worker = null;
-  }
-
-  /**
-   * 4. serialize the new `HasteMap` in a cache file.
-   */
-  private _persist(
-    hasteMap: InternalHasteMap,
-    data: FileCrawlData) {
-    persistence.write(this._cachePath, hasteMap, data);
   }
 
   /**

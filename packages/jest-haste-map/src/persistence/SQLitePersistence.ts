@@ -8,6 +8,7 @@ import {
   FileMetaData,
   ModuleMapItem,
   FileCrawlData,
+  FilePersistenceData,
 } from '../types';
 import H from '../constants';
 
@@ -17,9 +18,111 @@ class SQLitePersistence implements Persistence {
     const db = this.getDatabase(cachePath, true);
 
     // Fetch files.
-    const filesArr: Array<string> = db.prepare(`SELECT filePath FROM files where filePath regexp ?`).all(pattern);
+    const filesArr: Array<string> = db.prepare(`SELECT filePath FROM files where filePath REGEXP ?`).all(pattern);
 
     return filesArr;
+  }
+
+  private _getFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData) {
+    const {changedFiles, removedFiles, isFresh} = fileCrawlData;
+
+    const filePersistenceData = {
+      isFresh,
+      removedFiles,
+      changedFiles: new Map<string, FileMetaData>(),
+    };
+
+    if(isFresh) {
+      for(const [changedFilePath, changedFile] of changedFiles) {
+        const newFileMetadata: FileMetaData = [
+          '',
+          changedFile.mtime,
+          changedFile.size,
+          0,
+          '',
+          changedFile.sha1,         
+        ];
+        filePersistenceData.changedFiles.set(changedFilePath, newFileMetadata);
+      }
+    }
+    else {
+      for(const [changedFilePath, changedFile] of changedFiles) {
+        const existingFiledata = this.getFileMetadata(cachePath, changedFilePath);
+        if(existingFiledata && existingFiledata[H.MTIME] == changedFile.mtime) {
+          filePersistenceData.changedFiles.set(changedFilePath, existingFiledata);
+        } else if (existingFiledata && changedFile.sha1 &&
+          existingFiledata[H.SHA1] === changedFile.sha1) {
+          const updatedFileMetadata: FileMetaData = [
+            existingFiledata[H.ID],
+            changedFile.mtime,
+            changedFile.size,
+            existingFiledata[H.VISITED],
+            existingFiledata[H.DEPENDENCIES],
+            changedFile.sha1,
+          ];
+          filePersistenceData.changedFiles.set(changedFilePath, updatedFileMetadata);
+        }
+        else {
+          const newFileMetadata: FileMetaData = [
+            '',
+            changedFile.mtime,
+            changedFile.size,
+            0,
+            '',
+            changedFile.sha1,
+            
+          ];
+          filePersistenceData.changedFiles.set(changedFilePath, newFileMetadata);
+        }
+      }
+    }
+
+    return filePersistenceData;
+  }
+
+  writeFileData(cachePath: string, fileCrawlData: FileCrawlData): FilePersistenceData {
+    const db = this.getDatabase(cachePath, false);
+    const data: FilePersistenceData = this._getFilePersistenceData(cachePath, fileCrawlData);
+    const {changedFiles, removedFiles, isFresh} = data;
+
+    db.transaction(() => {
+      // Incrementally update files.
+      const runFileStmt = (
+        stmt: betterSqlLite3.Statement,
+        [filePath, file]: [string, FileMetaData],
+      ) => {
+        stmt.run(
+          filePath,
+          file[H.ID],
+          file[H.MTIME],
+          file[H.SIZE],
+          file[H.VISITED],
+          file[H.DEPENDENCIES],
+          file[H.SHA1],
+        );
+      };
+      
+      // Remove files as necessary
+      if (isFresh) {
+        db.exec('DELETE FROM files');
+      } else {
+        const removeFileStmt = db.prepare(`DELETE FROM files WHERE filePath=?`);
+        for (const filePath of removedFiles.keys()) {
+          removeFileStmt.run(filePath);
+        }
+      }
+
+      // Upsert changedFiles
+      const upsertFileStmt = db.prepare(
+        `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      );
+      for (const file of changedFiles) {
+        runFileStmt(upsertFileStmt, file);
+      }
+    });
+
+    db.close();
+    return data;
   }
   
   getFileMetadata(cachePath:string, filePath: string): FileMetaData {
@@ -174,49 +277,15 @@ class SQLitePersistence implements Persistence {
     return internalHasteMap;
   }
 
-  write(
+  writeInternalHasteMap(
     cachePath: string,
     internalHasteMap: InternalHasteMap,
-    data: FileCrawlData,
+    data: FilePersistenceData,
   ): void {
     const db = this.getDatabase(cachePath, false);
     const {changedFiles, removedFiles, isFresh} = data;
 
     db.transaction(() => {
-      // Incrementally update files.
-      const runFileStmt = (
-        stmt: betterSqlLite3.Statement,
-        [filePath, file]: [string, FileMetaData],
-      ) => {
-        stmt.run(
-          filePath,
-          file[H.ID],
-          file[H.MTIME],
-          file[H.SIZE],
-          file[H.VISITED],
-          file[H.DEPENDENCIES],
-          file[H.SHA1],
-        );
-      };
-      
-      // Remove files as necessary
-      if (isFresh) {
-        db.exec('DELETE FROM files');
-      } else {
-        const removeFileStmt = db.prepare(`DELETE FROM files WHERE filePath=?`);
-        for (const filePath of removedFiles.keys()) {
-          removeFileStmt.run(filePath);
-        }
-      }
-
-      // Upsert changedFiles
-      const upsertFileStmt = db.prepare(
-        `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      );
-      for (const file of changedFiles) {
-        runFileStmt(upsertFileStmt, file);
-      }
-
       // Incrementally update map.
       const runMapStmt = (
         stmt: betterSqlLite3.Statement,
