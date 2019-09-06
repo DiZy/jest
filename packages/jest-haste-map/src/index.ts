@@ -44,9 +44,11 @@ import {
   ModuleMapData,
   ModuleMetaData,
   WorkerMetadata,
+  FileCrawlData,
 } from './types';
 import persistence from './persistence/persistence';
 import HasteFS from './HasteFS';
+import SQLHasteFS from './SQLHasteFS';
 
 type HType = typeof H;
 
@@ -346,27 +348,35 @@ class HasteMap extends EventEmitter {
   build(): Promise<InternalHasteMapObject> {
     if (!this._buildPromise) {
       this._buildPromise = (async () => {
-        const data = await this._buildFileMap();
+        const buildFileMapResults = await this._buildFileMap();
+        const data = buildFileMapResults.data;
+        let hasteMap = buildFileMapResults.hasteMap;
 
-        // Persist when we don't know if files changed (changedFiles undefined)
+        const rootDir = this._options.rootDir;
+        
+        let hasteFS: HasteFS;
+        // Avoid loading all files if sqlite is available
+        if (persistence.getType() === 'sqlite') {
+          hasteFS = new SQLHasteFS(rootDir, this._cachePath);
+        } else {
+          let allFiles = persistence.readAllFiles(this._cachePath);
+          hasteFS = new DefaultHasteFS({
+            files: allFiles,
+            rootDir,
+          });
+        }
+
+        // Persist when we don't know if files changed (data is fresh)
         // or when we know a file was changed or deleted.
-        let hasteMap: InternalHasteMap;
         if (
-          data.changedFiles === undefined ||
+          data.isFresh ||
           data.changedFiles.size > 0 ||
           data.removedFiles.size > 0
         ) {
-          hasteMap = await this._buildHasteMap(data);
-          this._persist(hasteMap, data.removedFiles, data.changedFiles);
-        } else {
-          hasteMap = data.hasteMap;
+          hasteMap = await this._buildHasteMap(hasteMap, hasteFS, data);
+          this._persist(hasteMap, data);
         }
 
-        const rootDir = this._options.rootDir;
-        const hasteFS = new DefaultHasteFS({
-          files: hasteMap.files,
-          rootDir,
-        });
         const moduleMap = new HasteModuleMap({
           duplicates: hasteMap.duplicates,
           map: hasteMap.map,
@@ -375,7 +385,7 @@ class HasteMap extends EventEmitter {
         });
         const __hasteMapForTest =
           (process.env.NODE_ENV === 'test' && hasteMap) || null;
-        await this._watch(hasteMap);
+        await this._watch(hasteMap, hasteFS);
         return {
           __hasteMapForTest,
           hasteFS,
@@ -393,7 +403,7 @@ class HasteMap extends EventEmitter {
     let hasteMap: InternalHasteMap;
 
     try {
-      hasteMap = persistence.read(this._cachePath);
+      hasteMap = persistence.readInternalHasteMap(this._cachePath);
     } catch (err) {
       hasteMap = this._createEmptyMap();
     }
@@ -415,8 +425,7 @@ class HasteMap extends EventEmitter {
    * 2. crawl the file system.
    */
   private async _buildFileMap(): Promise<{
-    removedFiles: FileData;
-    changedFiles?: FileData;
+    data: FileCrawlData;
     hasteMap: InternalHasteMap;
   }> {
     let hasteMap: InternalHasteMap;
@@ -434,6 +443,7 @@ class HasteMap extends EventEmitter {
    */
   private _processFile(
     hasteMap: InternalHasteMap,
+    hasteFS: HasteFS,
     map: ModuleMapData,
     mocks: MockData,
     filePath: Config.Path,
@@ -505,7 +515,7 @@ class HasteMap extends EventEmitter {
     };
 
     const relativeFilePath = fastPath.relative(rootDir, filePath);
-    const fileMetadata = hasteMap.files.get(relativeFilePath);
+    const fileMetadata = hasteFS.getFileMetadata(relativeFilePath);
     if (!fileMetadata) {
       throw new Error(
         'jest-haste-map: File to process was not found in the haste map.',
@@ -551,7 +561,7 @@ class HasteMap extends EventEmitter {
 
       // If a file cannot be read we remove it from the file list and
       // ignore the failure silently.
-      hasteMap.files.delete(relativeFilePath);
+      hasteFS.deleteFileMetadata(relativeFilePath);
     };
 
     // If we retain all files in the virtual HasteFS representation, we avoid
@@ -646,30 +656,20 @@ class HasteMap extends EventEmitter {
       .then(workerReply, workerError);
   }
 
-  private _buildHasteMap(data: {
-    removedFiles: FileData;
-    changedFiles?: FileData;
-    hasteMap: InternalHasteMap;
-  }): Promise<InternalHasteMap> {
-    const {removedFiles, changedFiles, hasteMap} = data;
+  private _buildHasteMap(hasteMap: InternalHasteMap, hasteFS: HasteFS, data: FileCrawlData): Promise<InternalHasteMap> {
+    const {removedFiles, changedFiles} = data;
 
     // If any files were removed or we did not track what files changed, process
     // every file looking for changes. Otherwise, process only changed files.
-    let map: ModuleMapData;
-    let mocks: MockData;
-    let filesToProcess: FileData;
-    if (changedFiles === undefined || removedFiles.size) {
-      map = new Map();
-      mocks = new Map();
-      filesToProcess = hasteMap.files;
-    } else {
-      map = hasteMap.map;
-      mocks = hasteMap.mocks;
-      filesToProcess = changedFiles;
-    }
+    let map: ModuleMapData = hasteMap.map;
+    let mocks: MockData = hasteMap.mocks;
+    let filesToProcess: FileData = changedFiles;
 
-    for (const [relativeFilePath, fileMetadata] of removedFiles) {
-      this._recoverDuplicates(hasteMap, relativeFilePath, fileMetadata[H.ID]);
+    for (const [relativeFilePath] of removedFiles) {
+      const fileMetadata = hasteFS.getFileMetadata(relativeFilePath);
+      if(fileMetadata) {
+        this._recoverDuplicates(hasteMap, relativeFilePath, fileMetadata[H.ID]);
+      }
     }
 
     const promises = [];
@@ -685,7 +685,7 @@ class HasteMap extends EventEmitter {
         this._options.rootDir,
         relativeFilePath,
       );
-      const promise = this._processFile(hasteMap, map, mocks, filePath);
+      const promise = this._processFile(hasteMap, hasteFS, map, mocks, filePath);
       if (promise) {
         promises.push(promise);
       }
@@ -722,9 +722,8 @@ class HasteMap extends EventEmitter {
    */
   private _persist(
     hasteMap: InternalHasteMap,
-    removedFiles: FileData,
-    changedFiles?: FileData,) {
-    persistence.write(this._cachePath, hasteMap, removedFiles, changedFiles);
+    data: FileCrawlData) {
+    persistence.write(this._cachePath, hasteMap, data);
   }
 
   /**
@@ -747,7 +746,10 @@ class HasteMap extends EventEmitter {
     return this._worker;
   }
 
-  private _crawl(hasteMap: InternalHasteMap) {
+  private _crawl(hasteMap: InternalHasteMap): Promise<{
+    data: FileCrawlData;
+    hasteMap: InternalHasteMap;
+  }> {
     const options = this._options;
     const ignore = this._ignore.bind(this);
     const crawl =
@@ -796,7 +798,7 @@ class HasteMap extends EventEmitter {
   /**
    * Watch mode
    */
-  private _watch(hasteMap: InternalHasteMap): Promise<void> {
+  private _watch(hasteMap: InternalHasteMap, hasteFS: HasteFS): Promise<void> {
     if (!this._options.watch) {
       return Promise.resolve();
     }
@@ -850,10 +852,7 @@ class HasteMap extends EventEmitter {
         mustCopy = true;
         const changeEvent: ChangeEvent = {
           eventsQueue,
-          hasteFS: new DefaultHasteFS({
-            files: hasteMap.files,
-            rootDir,
-          }),
+          hasteFS,
           moduleMap: new HasteModuleMap({
             duplicates: hasteMap.duplicates,
             map: hasteMap.map,
@@ -903,7 +902,6 @@ class HasteMap extends EventEmitter {
             hasteMap = {
               clocks: new Map(hasteMap.clocks),
               duplicates: new Map(hasteMap.duplicates),
-              files: new Map(hasteMap.files),
               map: new Map(hasteMap.map),
               mocks: new Map(hasteMap.mocks),
             };
@@ -915,15 +913,14 @@ class HasteMap extends EventEmitter {
           };
 
           const relativeFilePath = fastPath.relative(rootDir, filePath);
-          const fileMetadata = hasteMap.files.get(relativeFilePath);
 
-          // If it's not an addition, delete the file and all its metadata
-          if (fileMetadata != null) {
-            const moduleName = fileMetadata[H.ID];
+          // If it exists, delete the file and all its metadata from hasteFS
+          const moduleName = hasteFS.getModuleName(relativeFilePath); // TODO: not sure whether to use relative or not
+          if(moduleName) {
             const platform =
               getPlatformExtension(filePath, this._options.platforms) ||
               H.GENERIC_PLATFORM;
-            hasteMap.files.delete(relativeFilePath);
+            hasteFS.deleteFileMetadata(relativeFilePath);
 
             let moduleMap = hasteMap.map.get(moduleName);
             if (moduleMap != null) {
@@ -964,9 +961,10 @@ class HasteMap extends EventEmitter {
               '',
               null,
             ];
-            hasteMap.files.set(relativeFilePath, fileMetadata);
+            hasteFS.setFileMetadata(relativeFilePath, fileMetadata);
             const promise = this._processFile(
               hasteMap,
+              hasteFS,
               hasteMap.map,
               hasteMap.mocks,
               filePath,
@@ -1115,7 +1113,6 @@ class HasteMap extends EventEmitter {
     return {
       clocks: new Map(),
       duplicates: new Map(),
-      files: new Map(),
       map: new Map(),
       mocks: new Map(),
     };

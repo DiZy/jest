@@ -8,13 +8,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {spawn} from 'child_process';
-import H from '../constants';
 import * as fastPath from '../lib/fast_path';
 import {
   CrawlerOptions,
-  FileData,
   IgnoreMatcher,
   InternalHasteMap,
+  FileCrawlData,
 } from '../types';
 
 type Result = Array<[/* id */ string, /* mtime */ number, /* size */ number]>;
@@ -136,7 +135,7 @@ function findNative(
 export = function nodeCrawl(
   options: CrawlerOptions,
 ): Promise<{
-  removedFiles: FileData;
+  data: FileCrawlData;
   hasteMap: InternalHasteMap;
 }> {
   const {
@@ -150,25 +149,20 @@ export = function nodeCrawl(
 
   return new Promise(resolve => {
     const callback = (list: Result) => {
-      const files = new Map();
-      const removedFiles = new Map(data.files);
+      const changedFiles = new Map();
       list.forEach(fileData => {
         const [filePath, mtime, size] = fileData;
         const relativeFilePath = fastPath.relative(rootDir, filePath);
-        const existingFile = data.files.get(relativeFilePath);
-        if (existingFile && existingFile[H.MTIME] === mtime) {
-          files.set(relativeFilePath, existingFile);
-        } else {
-          // See ../constants.js; SHA-1 will always be null and fulfilled later.
-          files.set(relativeFilePath, ['', mtime, size, 0, '', null]);
-        }
-        removedFiles.delete(relativeFilePath);
+        changedFiles.set(relativeFilePath, ['', mtime, size, 0, '', null]);
       });
-      data.files = files;
 
       resolve({
+        data: {
+          isFresh: true,
+          removedFiles: new Set<string>(),
+          changedFiles,
+        },
         hasteMap: data,
-        removedFiles,
       });
     };
 
