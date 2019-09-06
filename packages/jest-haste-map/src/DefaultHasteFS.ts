@@ -8,18 +8,25 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileData, FileMetaData} from './types';
+import {FileData, FileMetaData, FileCrawlData, FilePersistenceData} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
+import FilePersistence from './persistence/FilePersistence';
 
 export default class DefaultHasteFS implements HasteFS{
   private readonly _rootDir: Config.Path;
   private readonly _files: FileData;
+  private readonly _cachePath: Config.Path;
 
-  constructor({rootDir, files}: {rootDir: Config.Path; files: FileData}) {
+  constructor({rootDir, files, cachePath}: {rootDir: Config.Path; files: FileData; cachePath: Config.Path}) {
     this._rootDir = rootDir;
     this._files = files;
+    this._cachePath = cachePath;
+  }
+
+  persistFileData(fileCrawlData: FileCrawlData): FilePersistenceData {
+    return FilePersistence.writeFileData(this._cachePath, fileCrawlData);
   }
 
   setFileMetadata(filePath: string, fileMetadata: FileMetaData): void {

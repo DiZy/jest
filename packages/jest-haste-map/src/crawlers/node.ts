@@ -14,6 +14,7 @@ import {
   IgnoreMatcher,
   InternalHasteMap,
   FileCrawlData,
+  ChangedFileMetadata,
 } from '../types';
 
 type Result = Array<[/* id */ string, /* mtime */ number, /* size */ number]>;
@@ -149,11 +150,11 @@ export = function nodeCrawl(
 
   return new Promise(resolve => {
     const callback = (list: Result) => {
-      const changedFiles = new Map();
+      const changedFiles = new Map<string, ChangedFileMetadata>();
       list.forEach(fileData => {
         const [filePath, mtime, size] = fileData;
         const relativeFilePath = fastPath.relative(rootDir, filePath);
-        changedFiles.set(relativeFilePath, ['', mtime, size, 0, '', null]);
+        changedFiles.set(relativeFilePath, {mtime, size, sha1: null});
       });
 
       resolve({
