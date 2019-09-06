@@ -8,11 +8,12 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileData} from './types';
+import {FileData, FileMetaData} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
+import HasteFS from './HasteFS';
 
-export default class DefaultHasteFS {
+export default class DefaultHasteFS implements HasteFS{
   private readonly _rootDir: Config.Path;
   private readonly _files: FileData;
 
@@ -21,18 +22,31 @@ export default class DefaultHasteFS {
     this._files = files;
   }
 
+  setFileMetadata(filePath: string, fileMetadata: FileMetaData): void {
+    if(this._files.get(filePath)) {
+      this._files.set(filePath, fileMetadata);
+    }
+    else {
+      throw new Error("Tried to set metadata on a file that is not in the HasteFS");
+    }
+  }
+
+  deleteFileMetadata(filePath: string): void {
+    this._files.delete(filePath);
+  }
+
   getModuleName(file: Config.Path): string | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
     return (fileMetadata && fileMetadata[H.ID]) || null;
   }
 
   getSize(file: Config.Path): number | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
     return (fileMetadata && fileMetadata[H.SIZE]) || null;
   }
 
   getDependencies(file: Config.Path): Array<string> | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
 
     if (fileMetadata) {
       return fileMetadata[H.DEPENDENCIES]
@@ -44,12 +58,12 @@ export default class DefaultHasteFS {
   }
 
   getSha1(file: Config.Path): string | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
     return (fileMetadata && fileMetadata[H.SHA1]) || null;
   }
 
   exists(file: Config.Path): boolean {
-    return this._getFileData(file) != null;
+    return this.getFileMetadata(file) != null;
   }
 
   getAllFiles(): Array<Config.Path> {
@@ -93,7 +107,7 @@ export default class DefaultHasteFS {
     return files;
   }
 
-  private _getFileData(file: Config.Path) {
+  getFileMetadata(file: Config.Path): FileMetaData | undefined {
     const relativePath = fastPath.relative(this._rootDir, file);
     return this._files.get(relativePath);
   }

@@ -6,10 +6,14 @@
  */
 
 import {Config} from '@jest/types';
+import { FileMetaData } from './types';
 
 export default interface HasteFS {
+  
 
   getModuleName: (file: Config.Path) => string | null;
+
+  getFileMetadata(filePath: string): FileMetaData | undefined;
 
   getSize: (file: Config.Path) => number | null;
 
@@ -24,6 +28,10 @@ export default interface HasteFS {
   getFileIterator: () => Iterable<Config.Path>;
 
   getAbsoluteFileIterator: () => Iterable<Config.Path>;
+  
+  setFileMetadata(filePath: string, fileMetadata: FileMetaData): void;
+
+  deleteFileMetadata(filePath: string): void;
 
   matchFiles: (pattern: RegExp | string) => Array<Config.Path>;
 

@@ -3,15 +3,16 @@ import * as fs from 'fs';
 import betterSqlLite3 from 'better-sqlite3';
 import {
   InternalHasteMap,
-  QueryablePersistence,
+  Persistence,
   FileData,
   FileMetaData,
   ModuleMapItem,
+  FileCrawlData,
 } from '../types';
 import H from '../constants';
 
-class SQLitePersistence implements QueryablePersistence {
-  findFilePathsBasedOnPattern(pattern: string | RegExp, cachePath: string): Array<string> {
+class SQLitePersistence implements Persistence {
+  findFilePathsBasedOnPattern(cachePath: string, pattern: string | RegExp): Array<string> {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
@@ -21,7 +22,7 @@ class SQLitePersistence implements QueryablePersistence {
     return filesArr;
   }
   
-  getFileData(filePath: string, cachePath: string): FileMetaData {
+  getFileMetadata(cachePath:string, filePath: string): FileMetaData {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
@@ -39,18 +40,37 @@ class SQLitePersistence implements QueryablePersistence {
     return [file.id, file.mtime, file.size, file.visited, file.dependencies, file.sha1];
   }
 
-  read(cachePath: string): InternalHasteMap {
+  setFileMetadata(cachePath:string, filePath: string, fileMetadata: FileMetaData) {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath, true);
+    
+    // Upsert changedFiles
+    const upsertFileStmt = db.prepare(
+      `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    
+    upsertFileStmt.run(
+      filePath,
+      fileMetadata[H.ID],
+      fileMetadata[H.MTIME],
+      fileMetadata[H.SIZE],
+      fileMetadata[H.VISITED],
+      fileMetadata[H.DEPENDENCIES],
+      fileMetadata[H.SHA1],
+    );
+  }
+
+  deleteFileMetadata(cachePath: string, filePath: string) {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
-    // Create empty map to populate.
-    const internalHasteMap: InternalHasteMap = {
-      files: new Map(),
-      map: new Map(),
-      mocks: new Map(),
-      duplicates: new Map(),
-      clocks: new Map(),
-    };
+    // Fetch files.
+    db.prepare(`DELETE FROM files WHERE filePath=?`).run(filePath);
+  }
+
+  readAllFiles(cachePath: string): FileData {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath, true);
 
     // Fetch files.
     const filesArr: Array<{
@@ -62,8 +82,10 @@ class SQLitePersistence implements QueryablePersistence {
       dependencies: string;
       sha1: string;
     }> = db.prepare(`SELECT * FROM files`).all();
+
+    const fileMap = new Map<string, FileMetaData>();
     for (const file of filesArr) {
-      internalHasteMap.files.set(file.filePath, [
+      fileMap.set(file.filePath, [
         file.id,
         file.mtime,
         file.size,
@@ -72,6 +94,21 @@ class SQLitePersistence implements QueryablePersistence {
         file.sha1,
       ]);
     }
+
+    return fileMap;
+  }
+
+  readInternalHasteMap(cachePath: string): InternalHasteMap {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath, true);
+
+    // Create empty map to populate.
+    const internalHasteMap: InternalHasteMap = {
+      map: new Map(),
+      mocks: new Map(),
+      duplicates: new Map(),
+      clocks: new Map(),
+    };
 
     // Fetch map.
     const mapsArr: Array<{
@@ -140,10 +177,10 @@ class SQLitePersistence implements QueryablePersistence {
   write(
     cachePath: string,
     internalHasteMap: InternalHasteMap,
-    removedFiles: FileData,
-    changedFiles?: FileData,
+    data: FileCrawlData,
   ): void {
     const db = this.getDatabase(cachePath, false);
+    const {changedFiles, removedFiles, isFresh} = data;
 
     db.transaction(() => {
       // Incrementally update files.
@@ -161,25 +198,23 @@ class SQLitePersistence implements QueryablePersistence {
           file[H.SHA1],
         );
       };
-      if (changedFiles !== undefined) {
+      
+      // Remove files as necessary
+      if (isFresh) {
+        db.exec('DELETE FROM files');
+      } else {
         const removeFileStmt = db.prepare(`DELETE FROM files WHERE filePath=?`);
         for (const filePath of removedFiles.keys()) {
           removeFileStmt.run(filePath);
         }
-        const upsertFileStmt = db.prepare(
-          `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        );
-        for (const changedFile of changedFiles) {
-          runFileStmt(upsertFileStmt, changedFile);
-        }
-      } else {
-        db.exec('DELETE FROM files');
-        const insertFileStmt = db.prepare(
-          `INSERT INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        );
-        for (const file of internalHasteMap.files) {
-          runFileStmt(insertFileStmt, file);
-        }
+      }
+
+      // Upsert changedFiles
+      const upsertFileStmt = db.prepare(
+        `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      );
+      for (const file of changedFiles) {
+        runFileStmt(upsertFileStmt, file);
       }
 
       // Incrementally update map.
@@ -195,7 +230,16 @@ class SQLitePersistence implements QueryablePersistence {
           mapItem[H.ANDROID_PLATFORM] || [null, null],
         );
       };
-      if (changedFiles !== undefined) {
+
+      if (isFresh) {
+        db.exec('DELETE FROM map');
+        const insertMapItem = db.prepare(
+          `INSERT INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        );
+        for (const mapItem of internalHasteMap.map) {
+          runMapStmt(insertMapItem, mapItem);
+        }
+      } else {
         const removeMapItemStmt = db.prepare(`DELETE FROM map WHERE name=?`);
         for (const file of removedFiles.values()) {
           removeMapItemStmt.run(file[H.ID]);
@@ -209,14 +253,6 @@ class SQLitePersistence implements QueryablePersistence {
             runMapStmt(upsertFileStmt, [changedFile[H.MODULE], mapItem]);
           }
         }
-      } else {
-        db.exec('DELETE FROM map');
-        const insertMapItem = db.prepare(
-          `INSERT INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        );
-        for (const mapItem of internalHasteMap.map) {
-          runMapStmt(insertMapItem, mapItem);
-        }
       }
 
       // Replace mocks.
@@ -229,7 +265,8 @@ class SQLitePersistence implements QueryablePersistence {
       }
 
       // Incrementally update duplicates.
-      if (changedFiles === undefined) {
+      if (isFresh) {
+        db.exec('DELETE FROM duplicates');
         const insertDuplicateStmt = db.prepare(
           `INSERT INTO duplicates (name, serialized) VALUES (?, ?)`,
         );

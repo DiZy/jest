@@ -66,7 +66,6 @@ export type DuplicatesIndex = Map<string, Map<string, DuplicatesSet>>;
 export type InternalHasteMap = {
   clocks: WatchmanClocks;
   duplicates: DuplicatesIndex;
-  files: FileData;
   map: ModuleMapData;
   mocks: MockData;
 };
@@ -119,18 +118,19 @@ export type ChangeEvent = {
   moduleMap: ModuleMap;
 };
 
+export type FileCrawlData = {
+  removedFiles: Set<Config.Path>,
+  changedFiles: FileData,
+  isFresh: boolean,
+}
+
 export interface Persistence {
   write(
     cachePath: string,
     internalHasteMap: InternalHasteMap,
-    removedFiles: FileData, // Always tracked.
-    changedFiles?: FileData, // Only tracked with Watchman.
+    data: FileCrawlData,
   ): void;
-  read(cachePath: string): InternalHasteMap;
+  readInternalHasteMap(cachePath: string): InternalHasteMap;
+  readAllFiles(cachePath: string): FileData;
   getType(): string;
-}
-
-export interface QueryablePersistence extends Persistence {
-  getFileData(filePath: string, cachePath: string): FileMetaData;
-  findFilePathsBasedOnPattern(pattern: RegExp | string, cachePath: string): Array<string>;
 }

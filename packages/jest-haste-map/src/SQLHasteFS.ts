@@ -24,17 +24,17 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   getModuleName(file: Config.Path): string | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
     return (fileMetadata && fileMetadata[H.ID]) || null;
   }
 
   getSize(file: Config.Path): number | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
     return (fileMetadata && fileMetadata[H.SIZE]) || null;
   }
 
   getDependencies(file: Config.Path): Array<string> | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
 
     if (fileMetadata) {
       return fileMetadata[H.DEPENDENCIES]
@@ -46,12 +46,12 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   getSha1(file: Config.Path): string | null {
-    const fileMetadata = this._getFileData(file);
+    const fileMetadata = this.getFileMetadata(file);
     return (fileMetadata && fileMetadata[H.SHA1]) || null;
   }
 
   exists(file: Config.Path): boolean {
-    return this._getFileData(file) != null;
+    return this.getFileMetadata(file) != null;
   }
 
   getAllFiles(): Array<Config.Path> {
@@ -59,7 +59,7 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   getFileIterator(): Iterable<Config.Path> {
-    return SQLitePersistence.read(this._cachePath).files.keys();
+    return SQLitePersistence.readAllFiles(this._cachePath).keys();
   }
 
   *getAbsoluteFileIterator(): Iterable<Config.Path> {
@@ -69,7 +69,7 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   matchFiles(pattern: RegExp | string): Array<Config.Path> {
-    return SQLitePersistence.findFilePathsBasedOnPattern(pattern, this._cachePath);
+    return SQLitePersistence.findFilePathsBasedOnPattern(this._cachePath, pattern);
   }
 
   // TODO; update this to not use getAbsoluteFileIterator
@@ -87,7 +87,15 @@ export default class SQLHasteFS implements HasteFS {
     return files;
   }
 
-  private _getFileData(file: Config.Path): FileMetaData {
-    return SQLitePersistence.getFileData(file, this._cachePath);
+  getFileMetadata(file: Config.Path): FileMetaData {
+    return SQLitePersistence.getFileMetadata(this._cachePath, file);
+  }
+
+  setFileMetadata(filePath: Config.Path, fileMetadata: FileMetaData): void {
+    return SQLitePersistence.setFileMetadata(this._cachePath, filePath, fileMetadata);
+  }
+
+  deleteFileMetadata(file: Config.Path): void {
+    return SQLitePersistence.deleteFileMetadata(this._cachePath, file);
   }
 }

@@ -10,12 +10,12 @@ import watchman = require('fb-watchman');
 import {Config} from '@jest/types';
 import * as fastPath from '../lib/fast_path';
 import normalizePathSep from '../lib/normalizePathSep';
-import H from '../constants';
+
 import {
   CrawlerOptions,
-  FileData,
   FileMetaData,
   InternalHasteMap,
+  FileCrawlData,
 } from '../types';
 
 type WatchmanRoots = Map<string, Array<string>>;
@@ -33,8 +33,7 @@ function WatchmanError(error: Error): Error {
 export = async function watchmanCrawl(
   options: CrawlerOptions,
 ): Promise<{
-  changedFiles?: FileData;
-  removedFiles: FileData;
+  data: FileCrawlData,
   hasteMap: InternalHasteMap;
 }> {
   const fields = ['name', 'exists', 'mtime_ms', 'size'];
@@ -147,24 +146,16 @@ export = async function watchmanCrawl(
     };
   }
 
-  let files = data.files;
-  let removedFiles = new Map();
+  let removedFiles = new Set<Config.Path>();
   const changedFiles = new Map();
-  let watchmanFiles: Map<string, any>;
   let isFresh = false;
+  let watchmanFiles: Map<string, any>;
   try {
     const watchmanRoots = await getWatchmanRoots(roots);
     const watchmanFileResults = await queryWatchmanForDirs(watchmanRoots);
 
-    // Reset the file map if watchman was restarted and sends us a list of
-    // files.
-    if (watchmanFileResults.isFresh) {
-      files = new Map();
-      removedFiles = new Map(data.files);
-      isFresh = true;
-    }
-
     watchmanFiles = watchmanFileResults.files;
+    isFresh = watchmanFileResults.isFresh;
   } finally {
     client.end();
   }
@@ -182,25 +173,10 @@ export = async function watchmanCrawl(
     for (const fileData of response.files) {
       const filePath = fsRoot + path.sep + normalizePathSep(fileData.name);
       const relativeFilePath = fastPath.relative(rootDir, filePath);
-      const existingFileData = data.files.get(relativeFilePath);
 
-      // If watchman is fresh, the removed files map starts with all files
-      // and we remove them as we verify they still exist.
-      if (isFresh && existingFileData && fileData.exists) {
-        removedFiles.delete(relativeFilePath);
-      }
 
       if (!fileData.exists) {
-        // No need to act on files that do not exist and were not tracked.
-        if (existingFileData) {
-          files.delete(relativeFilePath);
-
-          // If watchman is not fresh, we will know what specific files were
-          // deleted since we last ran and can track only those files.
-          if (!isFresh) {
-            removedFiles.set(relativeFilePath, existingFileData);
-          }
-        }
+        removedFiles.add(relativeFilePath);
       } else if (!ignore(filePath)) {
         const mtime =
           typeof fileData.mtime_ms === 'number'
@@ -213,27 +189,7 @@ export = async function watchmanCrawl(
           sha1hex = null;
         }
 
-        let nextData: FileMetaData;
-
-        if (existingFileData && existingFileData[H.MTIME] === mtime) {
-          nextData = existingFileData;
-        } else if (
-          existingFileData &&
-          sha1hex &&
-          existingFileData[H.SHA1] === sha1hex
-        ) {
-          nextData = [
-            existingFileData[0],
-            mtime,
-            existingFileData[2],
-            existingFileData[3],
-            existingFileData[4],
-            existingFileData[5],
-          ];
-        } else {
-          // See ../constants.ts
-          nextData = ['', mtime, size, 0, '', sha1hex];
-        }
+        let nextData: FileMetaData = ['', mtime, size, 0, '', sha1hex];
 
         const mappings = options.mapper ? options.mapper(filePath) : null;
 
@@ -244,22 +200,22 @@ export = async function watchmanCrawl(
                 rootDir,
                 absoluteVirtualFilePath,
               );
-              files.set(relativeVirtualFilePath, nextData);
               changedFiles.set(relativeVirtualFilePath, nextData);
             }
           }
         } else {
-          files.set(relativeFilePath, nextData);
           changedFiles.set(relativeFilePath, nextData);
         }
       }
     }
   }
 
-  data.files = files;
   return {
-    changedFiles: isFresh ? undefined : changedFiles,
     hasteMap: data,
-    removedFiles,
+    data: {
+      removedFiles,
+      isFresh,
+      changedFiles,
+    },
   };
 };
