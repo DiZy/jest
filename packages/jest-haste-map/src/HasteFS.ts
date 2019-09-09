@@ -6,7 +6,7 @@
  */
 
 import {Config} from '@jest/types';
-import { FileMetaData, FileCrawlData, FilePersistenceData } from './types';
+import { FileMetaData, FileCrawlData, FilePersistenceData, FileData } from './types';
 
 export default interface HasteFS {
   persistFileData(fileCrawlData: FileCrawlData): FilePersistenceData;
@@ -22,6 +22,8 @@ export default interface HasteFS {
   getSha1: (file: Config.Path) => string | null;
 
   exists: (file: Config.Path) => boolean;
+
+  getAllFilesMap(): FileData;
 
   getAllFiles: () => Array<Config.Path>;
 
