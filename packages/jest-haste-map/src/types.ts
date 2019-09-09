@@ -134,6 +134,7 @@ export type FilePersistenceData = {
   removedFiles: Set<Config.Path>,
   changedFiles: FileData, // Contains final data to persist
   isFresh: boolean,
+  finalFiles?: FileData, // Only set by FilePersistence
 };
 
 export interface Persistence {

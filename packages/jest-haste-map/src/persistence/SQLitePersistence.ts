@@ -17,8 +17,15 @@ class SQLitePersistence implements Persistence {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
+    // db.function('regexp', (pattern: string, data: string): boolean => {
+    //   if(data.match(pattern)) {
+    //     return true;
+    //   }
+    //   return false;
+    // });
+
     // Fetch files.
-    const filesArr: Array<string> = db.prepare(`SELECT filePath FROM files where filePath REGEXP ?`).all(pattern);
+    const filesArr: Array<string> = db.prepare(`SELECT filePath FROM files where filePath LIKE ?`).all(pattern);
 
     return filesArr;
   }
@@ -125,7 +132,7 @@ class SQLitePersistence implements Persistence {
     return data;
   }
   
-  getFileMetadata(cachePath:string, filePath: string): FileMetaData {
+  getFileMetadata(cachePath:string, filePath: string): FileMetaData | undefined {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
@@ -138,7 +145,11 @@ class SQLitePersistence implements Persistence {
       visited: 0 | 1;
       dependencies: string;
       sha1: string;
-    } = db.prepare(`SELECT * FROM files WHERE filePath=?`).get(filePath);
+    } = db.prepare(`SELECT * FROM files WHERE filePath = ?`).get(filePath);
+
+    if(!file) {
+      return undefined;
+    }
 
     return [file.id, file.mtime, file.size, file.visited, file.dependencies, file.sha1];
   }
@@ -168,7 +179,7 @@ class SQLitePersistence implements Persistence {
     const db = this.getDatabase(cachePath, true);
 
     // Fetch files.
-    db.prepare(`DELETE FROM files WHERE filePath=?`).run(filePath);
+    db.prepare(`DELETE FROM files WHERE filePath = ?`).run(filePath);
   }
 
   readAllFiles(cachePath: string): FileData {

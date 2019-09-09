@@ -1,6 +1,6 @@
 import serializer from 'jest-serializer';
 import {InternalHasteMap, Persistence, FileData, FileCrawlData, FileMetaData, FilePersistenceData} from '../types';
-import { H } from '..';
+import H from '../constants';
 
 class FilePersistence implements Persistence {
   readInternalHasteMap(cachePath: string): InternalHasteMap {
@@ -8,19 +8,35 @@ class FilePersistence implements Persistence {
   }
 
   readAllFiles(cachePath: string): FileData {
-    return serializer.readFileSync(cachePath).files;
+    try {
+      return serializer.readFileSync(cachePath).files;
+    }
+    catch {
+      return new Map<string, FileMetaData>();
+    }
   }
 
   writeFileData(cachePath: string, data: FileCrawlData): FilePersistenceData {
 
     const {isFresh, removedFiles, changedFiles} = data;
 
-    const internalHasteMap = this.readInternalHasteMap(cachePath);
+    let internalHasteMap;;
+    try {
+      this.readInternalHasteMap(cachePath);
+    } catch {
+      internalHasteMap = {
+        clocks: new Map(),
+        duplicates: new Map(),
+        map: new Map(),
+        mocks: new Map(),
+      };
+    }
 
     const filePersistenceData = {
       isFresh,
       removedFiles,
       changedFiles: new Map<string, FileMetaData>(),
+      finalFiles: new Map<string, FileMetaData>(),
     };
 
     if(isFresh) {
@@ -34,6 +50,7 @@ class FilePersistence implements Persistence {
           changedFile.sha1,         
         ];
         filePersistenceData.changedFiles.set(changedFilePath, newFileMetadata);
+        filePersistenceData.finalFiles.set(changedFilePath, newFileMetadata);
       }
       serializer.writeFileSync(cachePath, {internalHasteMap, changedFiles});
     }
@@ -73,6 +90,8 @@ class FilePersistence implements Persistence {
           filePersistenceData.changedFiles.set(changedFilePath, newFileMetadata);
         }
       }
+      filePersistenceData.finalFiles = files;
+      serializer.writeFileSync(cachePath, {internalHasteMap, files});
     }
     return filePersistenceData;    
   }

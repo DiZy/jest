@@ -8,7 +8,7 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileMetaData, FileCrawlData, FilePersistenceData} from './types';
+import {FileMetaData, FileCrawlData, FilePersistenceData, FileData} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
@@ -58,6 +58,10 @@ export default class SQLHasteFS implements HasteFS {
     return this.getFileMetadata(file) != null;
   }
 
+  getAllFilesMap(): FileData {
+    return SQLitePersistence.readAllFiles(this._cachePath);
+  }
+
   getAllFiles(): Array<Config.Path> {
     return Array.from(this.getAbsoluteFileIterator());
   }
@@ -91,7 +95,7 @@ export default class SQLHasteFS implements HasteFS {
     return files;
   }
 
-  getFileMetadata(file: Config.Path): FileMetaData {
+  getFileMetadata(file: Config.Path): FileMetaData | undefined{
     return SQLitePersistence.getFileMetadata(this._cachePath, file);
   }
 

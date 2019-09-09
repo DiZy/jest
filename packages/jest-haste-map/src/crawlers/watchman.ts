@@ -33,7 +33,7 @@ function WatchmanError(error: Error): Error {
 export = async function watchmanCrawl(
   options: CrawlerOptions,
 ): Promise<{
-  data: FileCrawlData,
+  data: FileCrawlData;
   hasteMap: InternalHasteMap;
 }> {
   const fields = ['name', 'exists', 'mtime_ms', 'size'];

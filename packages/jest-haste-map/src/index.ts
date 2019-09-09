@@ -759,7 +759,10 @@ class HasteMap extends EventEmitter {
       roots: options.roots,
     };
 
-    const retry = (error: Error) => {
+    const retry = (error: Error): Promise<{
+      data: FileCrawlData;
+      hasteMap: InternalHasteMap;
+    }> => {
       if (crawl === watchmanCrawl) {
         this._console.warn(
           `jest-haste-map: Watchman crawl failed. Retrying once with node ` +
@@ -770,13 +773,22 @@ class HasteMap extends EventEmitter {
             `  ` +
             error,
         );
-        return nodeCrawl(crawlerOptions).catch(e => {
+        try {
+          return nodeCrawl(crawlerOptions).catch(e => {
+            throw new Error(
+              `Crawler retry failed:\n` +
+                `  Original error: ${error.message}\n` +
+                `  Retry error: ${e.message}\n`,
+            );
+          });
+        }
+        catch (e){
           throw new Error(
             `Crawler retry failed:\n` +
               `  Original error: ${error.message}\n` +
               `  Retry error: ${e.message}\n`,
           );
-        });
+        }
       }
 
       throw error;

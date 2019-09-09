@@ -16,7 +16,7 @@ import FilePersistence from './persistence/FilePersistence';
 
 export default class DefaultHasteFS implements HasteFS{
   private readonly _rootDir: Config.Path;
-  private readonly _files: FileData;
+  private _files: FileData;
   private readonly _cachePath: Config.Path;
 
   constructor({rootDir, files, cachePath}: {rootDir: Config.Path; files: FileData; cachePath: Config.Path}) {
@@ -26,7 +26,13 @@ export default class DefaultHasteFS implements HasteFS{
   }
 
   persistFileData(fileCrawlData: FileCrawlData): FilePersistenceData {
-    return FilePersistence.writeFileData(this._cachePath, fileCrawlData);
+    const filePersistenceData = FilePersistence.writeFileData(this._cachePath, fileCrawlData);
+    try {
+      this._files = filePersistenceData.finalFiles!;
+      return filePersistenceData;
+    } catch {
+      throw new Error("FilePersistence did not return finalFiles as needed");
+    }
   }
 
   setFileMetadata(filePath: string, fileMetadata: FileMetaData): void {
@@ -73,6 +79,10 @@ export default class DefaultHasteFS implements HasteFS{
     return this.getFileMetadata(file) != null;
   }
 
+  getAllFilesMap(): FileData {
+    return this._files;
+  }
+
   getAllFiles(): Array<Config.Path> {
     return Array.from(this.getAbsoluteFileIterator());
   }
@@ -115,7 +125,7 @@ export default class DefaultHasteFS implements HasteFS{
   }
 
   getFileMetadata(file: Config.Path): FileMetaData | undefined {
-    const relativePath = fastPath.relative(this._rootDir, file);
-    return this._files.get(relativePath);
+    // const relativePath = fastPath.relative(this._rootDir, file);
+    return this._files.get(file);
   }
 }

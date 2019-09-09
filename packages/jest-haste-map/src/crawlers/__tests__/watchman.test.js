@@ -169,7 +169,25 @@ describe('watchman watch', () => {
 
       expect(isFresh).toEqual(true);
 
-      expect(changedFiles).toEqual(mockFiles);
+      expect(changedFiles).toEqual(
+        createMap({
+          'fruits/strawberry.js': {
+            mtime: 30,
+            sha1: null,
+            size: 40,
+          },
+          'fruits/tomato.js': {
+            mtime: 31,
+            sha1: null,
+            size: 41,
+          },
+          'vegetables/melon.json': {
+            mtime: 33,
+            sha1: null,
+            size: 43,
+          },
+        }),
+      );
 
       expect(removedFiles).toEqual(new Set());
 
@@ -220,8 +238,16 @@ describe('watchman watch', () => {
       expect(isFresh).toEqual(true);
       expect(changedFiles).toEqual(
         createMap({
-          [path.join(DURIAN_RELATIVE, 'foo.1.js')]: ['', 33, 43, 0, '', null],
-          [path.join(DURIAN_RELATIVE, 'foo.2.js')]: ['', 33, 43, 0, '', null],
+          [path.join(DURIAN_RELATIVE, 'foo.1.js')]: {
+            mtime: 33,
+            sha1: null,
+            size: 43,
+          },
+          [path.join(DURIAN_RELATIVE, 'foo.2.js')]: {
+            mtime: 33,
+            sha1: null,
+            size: 43,
+          },
         }),
       );
       expect(removedFiles).toEqual(new Set());
@@ -286,7 +312,11 @@ describe('watchman watch', () => {
 
       expect(changedFiles).toEqual(
         createMap({
-          [KIWI_RELATIVE]: ['', 42, 40, 0, '', null],
+          [KIWI_RELATIVE]: {
+            mtime: 42,
+            sha1: null,
+            size: 40,
+          },
         }),
       );
 
@@ -294,7 +324,7 @@ describe('watchman watch', () => {
     });
   });
 
-  test('contains all in changedFiles and tracks removedFiles when watchman is fresh', () => {
+  test('contains all in changedFiles when watchman is fresh', () => {
     const mockTomatoSha1 = '321f6b7e8bf7f29aab89c5e41a555b1b0baa41a9';
 
     mockResponse = {
@@ -367,29 +397,30 @@ describe('watchman watch', () => {
       // strawberry and melon removed from the file list.
       expect(changedFiles).toEqual(
         createMap({
-          [BANANA_RELATIVE]: mockBananaMetadata,
-          [KIWI_RELATIVE]: ['', 42, 52, 0, '', null],
-          [TOMATO_RELATIVE]: ['Tomato', 76, 41, 1, [], mockTomatoSha1],
+          [BANANA_RELATIVE]: {
+            mtime: mockBananaMetadata[1],
+            sha1: mockBananaMetadata[5],
+            size: mockBananaMetadata[2],
+          },
+          [KIWI_RELATIVE]: {
+            mtime: 42,
+            sha1: null,
+            size: 52,
+          },
+          [TOMATO_RELATIVE]: {
+            mtime: 76,
+            sha1: mockTomatoSha1,
+            size: 41,
+          },
         }),
       );
 
-      // Even though the file list was reset, old file objects are still reused
-      // if no changes have been made
-      expect(hasteMap.files.get(BANANA_RELATIVE)).toBe(mockBananaMetadata);
-
-      // Old file objects are not reused if they have a different mtime
-      expect(hasteMap.files.get(TOMATO_RELATIVE)).not.toBe(mockTomatoMetadata);
-
-      expect(removedFiles).toEqual(
-        createMap({
-          [MELON_RELATIVE]: ['', 33, 43, 0, '', null],
-          [STRAWBERRY_RELATIVE]: ['', 30, 40, 0, '', null],
-        }),
-      );
+      // isFresh is true, so removedFiles can be ignored
+      expect(removedFiles).toEqual(new Set());
     });
   });
 
-  test('properly resets the file map when only one watcher is reset', () => {
+  test('properly detects isFresh when only one watcher is reset', () => {
     mockResponse = {
       'list-capabilities': {
         [undefined]: {
@@ -462,17 +493,21 @@ describe('watchman watch', () => {
 
       expect(changedFiles).toEqual(
         createMap({
-          [KIWI_RELATIVE]: ['', 42, 52, 0, '', null],
-          [MELON_RELATIVE]: ['', 33, 43, 0, '', null],
+          [KIWI_RELATIVE]: {
+            mtime: 42,
+            sha1: null,
+            size: 52,
+          },
+          [MELON_RELATIVE]: {
+            mtime: 33,
+            sha1: null,
+            size: 43,
+          },
         }),
       );
 
-      expect(removedFiles).toEqual(
-        createMap({
-          [STRAWBERRY_RELATIVE]: ['', 30, 40, 0, '', null],
-          [TOMATO_RELATIVE]: ['', 31, 41, 0, '', null],
-        }),
-      );
+      // isFresh is true, so we can ignore removedFiles
+      expect(removedFiles).toEqual(new Set());
     });
   });
 
@@ -553,7 +588,7 @@ describe('watchman watch', () => {
 
       expect(hasteMap.files).toEqual(new Map());
 
-      expect(removedFiles).toEqual(new Map());
+      expect(removedFiles).toEqual(new Set());
 
       expect(client.end).toBeCalled();
     });
