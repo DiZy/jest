@@ -138,7 +138,8 @@ export type FilePersistenceData = {
 };
 
 export interface Persistence {
-  writeFileData(cachePath: string, data: FileCrawlData): FilePersistenceData
+  createFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData): FilePersistenceData
+  writeFileData(cachePath: string, data: FilePersistenceData): void;
   writeInternalHasteMap(
     cachePath: string,
     internalHasteMap: InternalHasteMap,

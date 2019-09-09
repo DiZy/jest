@@ -30,7 +30,7 @@ class SQLitePersistence implements Persistence {
     return filesArr;
   }
 
-  private _getFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData) {
+  createFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData): FilePersistenceData {
     const {changedFiles, removedFiles, isFresh} = fileCrawlData;
 
     const filePersistenceData = {
@@ -87,9 +87,8 @@ class SQLitePersistence implements Persistence {
     return filePersistenceData;
   }
 
-  writeFileData(cachePath: string, fileCrawlData: FileCrawlData): FilePersistenceData {
+  writeFileData(cachePath: string, data: FilePersistenceData): void {
     const db = this.getDatabase(cachePath, false);
-    const data: FilePersistenceData = this._getFilePersistenceData(cachePath, fileCrawlData);
     const {changedFiles, removedFiles, isFresh} = data;
 
     db.transaction(() => {
@@ -129,7 +128,6 @@ class SQLitePersistence implements Persistence {
     });
 
     db.close();
-    return data;
   }
   
   getFileMetadata(cachePath:string, filePath: string): FileMetaData | undefined {
