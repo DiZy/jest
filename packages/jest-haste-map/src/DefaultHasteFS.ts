@@ -25,23 +25,21 @@ export default class DefaultHasteFS implements HasteFS{
     this._cachePath = cachePath;
   }
 
-  persistFileData(fileCrawlData: FileCrawlData): FilePersistenceData {
-    const filePersistenceData = FilePersistence.writeFileData(this._cachePath, fileCrawlData);
+  createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
+    return FilePersistence.createFilePersistenceData(this._cachePath, fileCrawlData);
+  }
+
+  persistFileData(filePersistenceData: FilePersistenceData): void {
+    FilePersistence.writeFileData(this._cachePath, filePersistenceData);
     try {
       this._files = filePersistenceData.finalFiles!;
-      return filePersistenceData;
     } catch {
-      throw new Error("FilePersistence did not return finalFiles as needed");
+      throw new Error("FilePersistence persistFileData was called without finalFiles");
     }
   }
 
   setFileMetadata(filePath: string, fileMetadata: FileMetaData): void {
-    if(this._files.get(filePath)) {
-      this._files.set(filePath, fileMetadata);
-    }
-    else {
-      throw new Error("Tried to set metadata on a file that is not in the HasteFS");
-    }
+    this._files.set(filePath, fileMetadata);
   }
 
   deleteFileMetadata(filePath: string): void {

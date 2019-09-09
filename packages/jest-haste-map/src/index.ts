@@ -46,6 +46,7 @@ import {
   WorkerMetadata,
   FileCrawlData,
   FilePersistenceData,
+  ModuleMapItem,
 } from './types';
 import persistence from './persistence/persistence';
 import HasteFS from './HasteFS';
@@ -375,8 +376,10 @@ class HasteMap extends EventEmitter {
           data.changedFiles.size > 0 ||
           data.removedFiles.size > 0
         ) {
-          const filePersistenceData = hasteFS.persistFileData(data);
-          hasteMap = await this._buildHasteMap(hasteMap, hasteFS, filePersistenceData);
+          const buildHasteMapResults = await this._buildHasteMap(hasteMap, hasteFS, data);
+          hasteMap = buildHasteMapResults.hasteMap;
+          const filePersistenceData = buildHasteMapResults.filePersistenceData;
+          hasteFS.persistFileData(filePersistenceData);
           persistence.writeInternalHasteMap(this._cachePath, hasteMap, filePersistenceData);
         }
 
@@ -446,12 +449,12 @@ class HasteMap extends EventEmitter {
    */
   private _processFile(
     hasteMap: InternalHasteMap,
-    hasteFS: HasteFS,
     map: ModuleMapData,
     mocks: MockData,
     filePath: Config.Path,
+    fileMetadata: FileMetaData,
     workerOptions?: {forceInBand: boolean},
-  ): Promise<void> | null {
+  ): Promise<{updatedData?: FileMetaData, removeFile: boolean}> | null {
     const rootDir = this._options.rootDir;
 
     const setModule = (id: string, module: ModuleMetaData) => {
@@ -518,12 +521,6 @@ class HasteMap extends EventEmitter {
     };
 
     const relativeFilePath = fastPath.relative(rootDir, filePath);
-    const fileMetadata = hasteFS.getFileMetadata(relativeFilePath);
-    if (!fileMetadata) {
-      throw new Error(
-        'jest-haste-map: File to process was not found in the haste map.',
-      );
-    }
 
     const moduleMetadata = hasteMap.map.get(fileMetadata[H.ID]);
     const computeSha1 = this._options.computeSha1 && !fileMetadata[H.SHA1];
@@ -548,6 +545,8 @@ class HasteMap extends EventEmitter {
       if (computeSha1) {
         fileMetadata[H.SHA1] = metadata.sha1;
       }
+
+      return {updatedData: fileMetadata, removeFile: false};
     };
 
     // Callback called when the response from the worker is an error.
@@ -564,7 +563,7 @@ class HasteMap extends EventEmitter {
 
       // If a file cannot be read we remove it from the file list and
       // ignore the failure silently.
-      hasteFS.deleteFileMetadata(relativeFilePath);
+      return {removeFile: true};
     };
 
     // If we retain all files in the virtual HasteFS representation, we avoid
@@ -659,24 +658,46 @@ class HasteMap extends EventEmitter {
       .then(workerReply, workerError);
   }
 
-  private _buildHasteMap(hasteMap: InternalHasteMap, hasteFS: HasteFS, data: FilePersistenceData): Promise<InternalHasteMap> {
-    const {removedFiles, changedFiles} = data;
-
+  private _buildHasteMap(
+    hasteMap: InternalHasteMap,
+    hasteFS: HasteFS,
+    fileCrawlData: FileCrawlData,
+    ): Promise<{hasteMap: InternalHasteMap, filePersistenceData: FilePersistenceData}> {
     // If any files were removed or we did not track what files changed, process
     // every file looking for changes. Otherwise, process only changed files.
     let map: ModuleMapData = hasteMap.map;
     let mocks: MockData = hasteMap.mocks;
-    let filesToProcess: FileData = changedFiles
 
-    for (const [relativeFilePath] of removedFiles) {
+    if(fileCrawlData.isFresh) {
+      map = new Map<string, ModuleMapItem>();
+      mocks = new Map<string, string>();
+    }
+
+    const filePersistenceData: FilePersistenceData = hasteFS.createFilePersistenceData(fileCrawlData);;
+    let filesToProcess: FileData = filePersistenceData.changedFiles;
+    const removedFiles = filePersistenceData.removedFiles;
+
+    for (const relativeFilePath of removedFiles) {
       const fileMetadata = hasteFS.getFileMetadata(relativeFilePath);
       if(fileMetadata) {
+        if(fileMetadata[H.ID]) {
+          const platform =
+            getPlatformExtension(relativeFilePath, this._options.platforms) ||
+            H.GENERIC_PLATFORM;
+          if (map.get(fileMetadata[H.ID]) && map.get(fileMetadata[H.ID])![platform]) {
+            delete map.get(fileMetadata[H.ID])![platform];
+          }
+          if(map.get(fileMetadata[H.ID]) && Object.keys(map.get(fileMetadata[H.ID])!).length === 0) {
+            map.delete(fileMetadata[H.ID]);
+          }
+          mocks.delete(fileMetadata[H.ID]);
+        }
         this._recoverDuplicates(hasteMap, relativeFilePath, fileMetadata[H.ID]);
       }
     }
 
     const promises = [];
-    for (const relativeFilePath of filesToProcess.keys()) {
+    for (const [relativeFilePath, fileMetaData] of filesToProcess) {
       if (
         this._options.skipPackageJson &&
         relativeFilePath.endsWith(PACKAGE_JSON)
@@ -688,7 +709,28 @@ class HasteMap extends EventEmitter {
         this._options.rootDir,
         relativeFilePath,
       );
-      const promise = this._processFile(hasteMap, hasteFS, map, mocks, filePath);
+      const processFilePromise = this._processFile(hasteMap, map, mocks, filePath, fileMetaData);
+      let promise: Promise<void> | undefined;
+      if(processFilePromise) {
+        promise = new Promise<void>((resolve) => {
+          processFilePromise.then(value => {
+            if(value.removeFile) {
+              filePersistenceData.removedFiles.add(relativeFilePath);
+              filePersistenceData.changedFiles.delete(relativeFilePath);
+              if (filePersistenceData.finalFiles) {
+                filePersistenceData.finalFiles.delete(relativeFilePath);
+              }
+            }
+            if(value.updatedData) {
+              filePersistenceData.changedFiles.set(relativeFilePath, value.updatedData);
+              if(filePersistenceData.finalFiles) {
+                filePersistenceData.finalFiles.set(relativeFilePath, value.updatedData);
+              }
+            }
+            resolve();
+          });
+        });
+      }
       if (promise) {
         promises.push(promise);
       }
@@ -699,7 +741,10 @@ class HasteMap extends EventEmitter {
         this._cleanup();
         hasteMap.map = map;
         hasteMap.mocks = mocks;
-        return hasteMap;
+        return {
+          hasteMap,
+          filePersistenceData,
+        };
       },
       error => {
         this._cleanup();
@@ -921,7 +966,7 @@ class HasteMap extends EventEmitter {
           const relativeFilePath = fastPath.relative(rootDir, filePath);
 
           // If it exists, delete the file and all its metadata from hasteFS
-          const moduleName = hasteFS.getModuleName(relativeFilePath); // TODO: not sure whether to use relative or not
+          const moduleName = hasteFS.getModuleName(relativeFilePath);
           if(moduleName) {
             const platform =
               getPlatformExtension(filePath, this._options.platforms) ||
@@ -967,19 +1012,34 @@ class HasteMap extends EventEmitter {
               '',
               null,
             ];
-            hasteFS.setFileMetadata(relativeFilePath, fileMetadata);
             const promise = this._processFile(
               hasteMap,
-              hasteFS,
               hasteMap.map,
               hasteMap.mocks,
               filePath,
+              fileMetadata,
               {forceInBand: true},
             );
+            hasteFS.setFileMetadata(relativeFilePath, fileMetadata);
             // Cleanup
             this._cleanup();
             if (promise) {
-              return promise.then(add);
+              return new Promise<void>((resolve) => {
+                promise.then((value) => {
+                  if(value.removeFile) {
+                    hasteFS.deleteFileMetadata(relativeFilePath);
+                  }
+                  else {
+                    if(value.updatedData) {
+                      hasteFS.setFileMetadata(relativeFilePath, value.updatedData);
+                    }
+                    else {
+                      hasteFS.setFileMetadata(relativeFilePath, fileMetadata);
+                    }
+                  }
+                  resolve();
+                }
+              )}).then(add);
             } else {
               // If a file in node_modules has changed,
               // emit an event regardless.

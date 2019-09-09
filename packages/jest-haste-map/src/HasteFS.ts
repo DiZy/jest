@@ -9,7 +9,10 @@ import {Config} from '@jest/types';
 import { FileMetaData, FileCrawlData, FilePersistenceData, FileData } from './types';
 
 export default interface HasteFS {
-  persistFileData(fileCrawlData: FileCrawlData): FilePersistenceData;
+
+  createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData;
+
+  persistFileData(filePersistenceData: FilePersistenceData): void;
 
   getModuleName: (file: Config.Path) => string | null;
 

@@ -23,9 +23,13 @@ export default class SQLHasteFS implements HasteFS {
     this._cachePath = cachePath;
   }
 
-  persistFileData(fileCrawlData: FileCrawlData): FilePersistenceData {
-    return SQLitePersistence.writeFileData(this._cachePath, fileCrawlData);
+  createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
+    return SQLitePersistence.createFilePersistenceData(this._cachePath, fileCrawlData);
   }
+
+  persistFileData(data: FilePersistenceData): void {
+    return SQLitePersistence.writeFileData(this._cachePath, data);
+  };
 
   getModuleName(file: Config.Path): string | null {
     const fileMetadata = this.getFileMetadata(file);
