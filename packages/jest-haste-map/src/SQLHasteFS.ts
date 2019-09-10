@@ -99,15 +99,25 @@ export default class SQLHasteFS implements HasteFS {
     return files;
   }
 
-  getFileMetadata(file: Config.Path): FileMetaData | undefined{
-    return SQLitePersistence.getFileMetadata(this._cachePath, file);
+  getFileMetadata(file: Config.Path): FileMetaData | undefined {
+    const relativePath = this._convertToRelativePath(file);
+    return SQLitePersistence.getFileMetadata(this._cachePath, relativePath);
   }
 
   setFileMetadata(filePath: Config.Path, fileMetadata: FileMetaData): void {
-    return SQLitePersistence.setFileMetadata(this._cachePath, filePath, fileMetadata);
+    const relativePath = this._convertToRelativePath(filePath);
+    return SQLitePersistence.setFileMetadata(this._cachePath, relativePath, fileMetadata);
   }
 
   deleteFileMetadata(file: Config.Path): void {
-    return SQLitePersistence.deleteFileMetadata(this._cachePath, file);
+    const relativePath = this._convertToRelativePath(file);
+    return SQLitePersistence.deleteFileMetadata(this._cachePath, relativePath);
+  }
+
+  private _convertToRelativePath(file: Config.Path): Config.Path {
+    if(file.includes(this._rootDir)) {
+      return fastPath.relative(this._rootDir, file);
+    }
+    return file;
   }
 }
