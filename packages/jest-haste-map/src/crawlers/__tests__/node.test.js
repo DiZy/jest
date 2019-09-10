@@ -114,7 +114,7 @@ describe('node crawler', () => {
       ignore: pearMatcher,
       rootDir,
       roots: ['/project/fruits', '/project/vegtables'],
-    }).then(({hasteMap, removedFiles}) => {
+    }).then(({hasteMap, data: {removedFiles, changedFiles, isFresh}}) => {
       expect(childProcess.spawn).lastCalledWith('find', [
         '/project/fruits',
         '/project/vegtables',
@@ -129,17 +129,29 @@ describe('node crawler', () => {
         ')',
       ]);
 
-      expect(hasteMap.files).not.toBe(null);
+      expect(isFresh).toBe(true);
 
-      expect(hasteMap.files).toEqual(
+      expect(changedFiles).toEqual(
         createMap({
-          'fruits/strawberry.js': ['', 32, 42, 0, '', null],
-          'fruits/tomato.js': ['', 33, 42, 0, '', null],
-          'vegetables/melon.json': ['', 34, 42, 0, '', null],
+          'fruits/strawberry.js': {
+            mtime: 32,
+            sha1: null,
+            size: 42,
+          },
+          'fruits/tomato.js': {
+            mtime: 33,
+            sha1: null,
+            size: 42,
+          },
+          'vegetables/melon.json': {
+            mtime: 34,
+            sha1: null,
+            size: 42,
+          },
         }),
       );
 
-      expect(removedFiles).toEqual(new Map());
+      expect(removedFiles).toEqual(new Set());
     });
 
     return promise;

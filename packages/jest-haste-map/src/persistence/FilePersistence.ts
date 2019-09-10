@@ -82,7 +82,7 @@ class FilePersistence implements Persistence {
   }
 
   writeFileData(cachePath: string, data: FilePersistenceData): void {
-    let internalHasteMap;;
+    let internalHasteMap;
     try {
       this.readInternalHasteMap(cachePath);
     } catch {

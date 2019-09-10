@@ -113,7 +113,7 @@ class SQLitePersistence implements Persistence {
         db.exec('DELETE FROM files');
       } else {
         const removeFileStmt = db.prepare(`DELETE FROM files WHERE filePath=?`);
-        for (const filePath of removedFiles.keys()) {
+        for (const filePath of removedFiles) {
           removeFileStmt.run(filePath);
         }
       }
@@ -125,7 +125,7 @@ class SQLitePersistence implements Persistence {
       for (const file of changedFiles) {
         runFileStmt(upsertFileStmt, file);
       }
-    });
+    })();
 
     db.close();
   }
