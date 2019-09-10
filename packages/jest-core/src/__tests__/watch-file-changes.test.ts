@@ -96,8 +96,6 @@ describe('Watch mode flows with changed files', () => {
       resolver: Runtime.createResolver(config, hasteMap.moduleMap),
     }));
 
-    console.log(realContext.hasteFS.getAllFilesMap());
-
     const hook = new JestHook();
     const firstErrorPromise = new Promise(resolve => {
       hook.getSubscriber().onTestRunComplete(resolve);

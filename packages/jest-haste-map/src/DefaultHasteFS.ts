@@ -39,11 +39,13 @@ export default class DefaultHasteFS implements HasteFS{
   }
 
   setFileMetadata(filePath: string, fileMetadata: FileMetaData): void {
-    this._files.set(filePath, fileMetadata);
+    const relativePath = this._convertToRelativePath(filePath);
+    this._files.set(relativePath, fileMetadata);
   }
 
   deleteFileMetadata(filePath: string): void {
-    this._files.delete(filePath);
+    const relativePath = this._convertToRelativePath(filePath);
+    this._files.delete(relativePath);
   }
 
   getModuleName(file: Config.Path): string | null {
@@ -123,7 +125,14 @@ export default class DefaultHasteFS implements HasteFS{
   }
 
   getFileMetadata(file: Config.Path): FileMetaData | undefined {
-    // const relativePath = fastPath.relative(this._rootDir, file);
-    return this._files.get(file);
+    const relativePath = this._convertToRelativePath(file);
+    return this._files.get(relativePath);
+  }
+
+  private _convertToRelativePath(file: Config.Path): Config.Path {
+    if(file.includes(this._rootDir)) {
+      return fastPath.relative(this._rootDir, file);
+    }
+    return file;
   }
 }
