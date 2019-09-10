@@ -315,15 +315,17 @@ export default function watch(
       outputStream,
       startRun,
       testWatcher,
-    }).catch(error =>
+    }).catch(error => {
       // Errors thrown inside `runJest`, e.g. by resolvers, are caught here for
       // continuous watch mode execution. We need to reprint them to the
       // terminal and give just a little bit of extra space so they fit below
       // `preRunMessagePrint` message nicely.
+      console.log(error);
       console.error(
         '\n\n' +
           formatExecError(error, contexts[0].config, {noStackTrace: false}),
-      ),
+      );
+    }
     );
   };
 

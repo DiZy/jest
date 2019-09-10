@@ -1353,7 +1353,7 @@ describe('HasteMap', () => {
         const {eventsQueue, hasteFS, moduleMap} = await waitForItToChange(hm);
         expect(eventsQueue).toHaveLength(2);
         expect(eventsQueue).toEqual([
-          {
+          { 
             filePath: '/project/fruits/Orange.ios.js',
             stat: MOCK_STAT_FILE,
             type: 'change',
