@@ -34,6 +34,7 @@ jest.mock('jest-worker', () =>
 );
 
 jest.mock('../crawlers/node', () => jest.fn(options => {}));
+
 jest.mock('../crawlers/watchman', () =>
   jest.fn(options => {
     const path = require('path');
@@ -51,7 +52,7 @@ jest.mock('../crawlers/watchman', () =>
         if (list[file]) {
           const hash = computeSha1 ? mockHashContents(list[file]) : null;
 
-          changedFiles.set(relativeFilePath, {mtime: 32, sha1: hash, size: 42});
+          changedFiles.set(relativeFilePath, {mtime : mockMTime, sha1: hash, size: 42});
         } else {
           removedFiles.add(relativeFilePath);
         }
@@ -147,6 +148,7 @@ let mockEmitters;
 let mockEnd;
 let mockWorker;
 let getCacheFilePath;
+let mockMTime;
 
 describe('HasteMap', () => {
   skipSuiteOnWindows();
@@ -212,6 +214,7 @@ describe('HasteMap', () => {
       roots: ['/project/fruits', '/project/vegetables'],
       useWatchman: true,
     };
+    mockMTime = 32;
   });
 
   afterEach(() => {
@@ -689,6 +692,7 @@ describe('HasteMap', () => {
       .build()
       .then(({__hasteMapForTest: initialData, hasteFS: initialHasteFS}) => {
         fs.readFileSync.mockClear();
+        mockMTime = 40;
 
         // Let's assume one JS file has changed.
         mockChangedFiles = object({
@@ -724,7 +728,7 @@ describe('HasteMap', () => {
 
             expect(useBuitinsInContext(data.clocks)).toEqual(mockClocks);
 
-            files.set('fruits/Banana.js', ['Banana', 32, 42, 1, 'Kiwi', null]);
+            files.set('fruits/Banana.js', ['Banana', 40, 42, 1, 'Kiwi', null]);
 
             expect(useBuitinsInContext(hasteFS.getAllFilesMap())).toEqual(
               files,
