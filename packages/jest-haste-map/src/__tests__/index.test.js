@@ -527,6 +527,9 @@ describe('HasteMap', () => {
       ).toEqual(['', 32, 42, 0, '', null]);
 
       expect(data.map.get('fbjs')).not.toBeDefined();
+
+      // cache file twice + 5 modules (excludes the node_module)
+      expect(fs.readFileSync.mock.calls.length).toBe(7);
     });
   });
 
@@ -650,9 +653,9 @@ describe('HasteMap', () => {
     new HasteMap(defaultConfig)
       .build()
       .then(({__hasteMapForTest: initialData}) => {
-        // The first run should access the file system once for the (empty)
-        // cache file and five times for the files in the system.
-        // expect(fs.readFileSync.mock.calls.length).toBe(6);
+        // The first run should access the file system twice for fileData then InternalHasteMap
+        // and five times for the files in the system.
+        expect(fs.readFileSync.mock.calls.length).toBe(7);
 
         fs.readFileSync.mockClear();
 
@@ -668,7 +671,8 @@ describe('HasteMap', () => {
         return new HasteMap(defaultConfig)
           .build()
           .then(({__hasteMapForTest: data}) => {
-            // expect(fs.readFileSync.mock.calls.length).toBe(1);
+            // The second time should not need to access the five files
+            expect(fs.readFileSync.mock.calls.length).toBe(2);
             if (require('v8').deserialize) {
               expect(fs.readFileSync).toBeCalledWith(cacheFilePath);
             } else {
@@ -704,17 +708,19 @@ describe('HasteMap', () => {
         return new HasteMap(defaultConfig)
           .build()
           .then(({__hasteMapForTest: data, hasteFS}) => {
-            // expect(fs.readFileSync.mock.calls.length).toBe(2);
+            expect(fs.readFileSync.mock.calls.length).toBe(3);
 
-            // if (require('v8').serialize) {
-            //   expect(fs.readFileSync).toBeCalledWith(cacheFilePath);
-            // } else {
-            //   expect(fs.readFileSync).toBeCalledWith(cacheFilePath, 'utf8');
-            // }
-            // expect(fs.readFileSync).toBeCalledWith(
-            //   '/project/fruits/Banana.js',
-            //   'utf8',
-            // );
+            if (require('v8').serialize) {
+              expect(fs.readFileSync).toBeCalledWith(cacheFilePath);
+              expect(fs.readFileSync).toBeCalledWith(cacheFilePath);
+            } else {
+              expect(fs.readFileSync).toBeCalledWith(cacheFilePath, 'utf8');
+              expect(fs.readFileSync).toBeCalledWith(cacheFilePath, 'utf8');
+            }
+            expect(fs.readFileSync).toBeCalledWith(
+              '/project/fruits/Banana.js',
+              'utf8',
+            );
 
             expect(useBuitinsInContext(data.clocks)).toEqual(mockClocks);
 
@@ -1353,7 +1359,7 @@ describe('HasteMap', () => {
         const {eventsQueue, hasteFS, moduleMap} = await waitForItToChange(hm);
         expect(eventsQueue).toHaveLength(2);
         expect(eventsQueue).toEqual([
-          { 
+          {
             filePath: '/project/fruits/Orange.ios.js',
             stat: MOCK_STAT_FILE,
             type: 'change',
