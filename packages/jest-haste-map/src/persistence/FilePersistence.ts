@@ -16,7 +16,7 @@ class FilePersistence implements Persistence {
     }
   }
 
-  createFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData): FilePersistenceData {
+  createFilePersistenceData(_cachePath: string, fileCrawlData: FileCrawlData, oldFiles?: FileData): FilePersistenceData {
     const {isFresh, removedFiles, changedFiles} = fileCrawlData;
 
     const filePersistenceData = {
@@ -41,7 +41,7 @@ class FilePersistence implements Persistence {
       }
     }
     else {
-      const files = this.readAllFiles(cachePath);
+      const files = new Map(oldFiles!);
       for(const removedFilePath of removedFiles) {
         files.delete(removedFilePath);
       }
@@ -81,29 +81,21 @@ class FilePersistence implements Persistence {
     return filePersistenceData;
   }
 
-  writeFileData(cachePath: string, data: FilePersistenceData): void {
-    let internalHasteMap;
-    try {
-      this.readInternalHasteMap(cachePath);
-    } catch {
-      internalHasteMap = {
-        clocks: new Map(),
-        duplicates: new Map(),
-        map: new Map(),
-        mocks: new Map(),
-      };
-    }
-    
-    serializer.writeFileSync(cachePath, {internalHasteMap, files: data.finalFiles!});
+  writeFileData(cachePath: string, data: FilePersistenceData, hasteMap: InternalHasteMap): void {
+    serializer.writeFileSync(cachePath, {internalHasteMap: hasteMap, files: data.finalFiles!});
   }
 
   writeInternalHasteMap(
     cachePath: string,
     internalHasteMap: InternalHasteMap,
-    _fileData: FilePersistenceData): void {
+    fileData: FilePersistenceData): void {
 
-    const files = this.readAllFiles(cachePath);
-    serializer.writeFileSync(cachePath, {internalHasteMap, files});
+    try{ 
+      const files = fileData.finalFiles!;
+      serializer.writeFileSync(cachePath, {internalHasteMap, files});
+    } catch {
+      throw new Error("FilePersistence writeInternalHasteMap was called without finalFiles");
+    }
   }
 
   getType() {

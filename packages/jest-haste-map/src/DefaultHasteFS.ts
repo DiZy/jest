@@ -8,7 +8,7 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileData, FileMetaData, FileCrawlData, FilePersistenceData} from './types';
+import {FileData, FileMetaData, FileCrawlData, FilePersistenceData, InternalHasteMap} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
@@ -26,11 +26,11 @@ export default class DefaultHasteFS implements HasteFS{
   }
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
-    return FilePersistence.createFilePersistenceData(this._cachePath, fileCrawlData);
+    return FilePersistence.createFilePersistenceData(this._cachePath, fileCrawlData, this._files);
   }
 
-  persistFileData(filePersistenceData: FilePersistenceData): void {
-    FilePersistence.writeFileData(this._cachePath, filePersistenceData);
+  persistFileData(filePersistenceData: FilePersistenceData, hasteMap: InternalHasteMap): void {
+    FilePersistence.writeFileData(this._cachePath, filePersistenceData, hasteMap);
     try {
       this._files = filePersistenceData.finalFiles!;
     } catch {

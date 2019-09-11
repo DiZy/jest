@@ -379,7 +379,7 @@ class HasteMap extends EventEmitter {
           const buildHasteMapResults = await this._buildHasteMap(hasteMap, hasteFS, data);
           hasteMap = buildHasteMapResults.hasteMap;
           const filePersistenceData = buildHasteMapResults.filePersistenceData;
-          hasteFS.persistFileData(filePersistenceData);
+          hasteFS.persistFileData(filePersistenceData, hasteMap);
           persistence.writeInternalHasteMap(this._cachePath, hasteMap, filePersistenceData);
         }
 
