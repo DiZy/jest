@@ -151,6 +151,7 @@ const groupOptions = (
     testSequencer: options.testSequencer,
     testTimeout: options.testTimeout,
     updateSnapshot: options.updateSnapshot,
+    useSQLite: options.useSQLite,
     useStderr: options.useStderr,
     verbose: options.verbose,
     watch: options.watch,
@@ -211,6 +212,7 @@ const groupOptions = (
     transform: options.transform,
     transformIgnorePatterns: options.transformIgnorePatterns,
     unmockedModulePathPatterns: options.unmockedModulePathPatterns,
+    useSQLite: options.useSQLite,
     watchPathIgnorePatterns: options.watchPathIgnorePatterns,
   }),
 });
