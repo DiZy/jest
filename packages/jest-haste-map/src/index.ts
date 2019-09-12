@@ -50,6 +50,7 @@ import {
 } from './types';
 import getPersistence from './persistence/persistence';
 import HasteFS from './HasteFS';
+import { reject } from 'q';
 
 type HType = typeof H;
 
@@ -716,7 +717,7 @@ class HasteMap extends EventEmitter {
       const processFilePromise = this._processFile(hasteMap, map, mocks, filePath, fileMetaData);
       let promise: Promise<void> | undefined;
       if(processFilePromise) {
-        promise = new Promise<void>((resolve) => {
+        promise = new Promise<void>((resolve, reject) => {
           processFilePromise.then(value => {
             if(value.removeFile) {
               filePersistenceData.removedFiles.add(relativeFilePath);
@@ -732,7 +733,8 @@ class HasteMap extends EventEmitter {
               }
             }
             resolve();
-          });
+          })
+          .catch(e => {reject(e);});
         });
       }
       if (promise) {
