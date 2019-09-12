@@ -12,7 +12,6 @@
   "dependencies": {
     "@jest/types": "^24.9.0",
     "anymatch": "^3.0.3",
-    "@types/better-sqlite3": "^5.2.3",
     "fb-watchman": "^2.0.0",
     "graceful-fs": "^4.1.15",
     "invariant": "^2.2.4",

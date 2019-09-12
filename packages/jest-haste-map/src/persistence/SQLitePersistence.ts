@@ -13,21 +13,14 @@ import {
 import H from '../constants';
 
 class SQLitePersistence implements Persistence {
-  findFilePathsBasedOnPattern(cachePath: string, pattern: string | RegExp): Array<string> {
+  findFilePathsBasedOnPattern(cachePath: string, pattern: string): Array<string> {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
-    // db.function('regexp', (pattern: string, data: string): boolean => {
-    //   if(data.match(pattern)) {
-    //     return true;
-    //   }
-    //   return false;
-    // });
-
     // Fetch files.
-    const filesArr: Array<string> = db.prepare(`SELECT filePath FROM files where filePath LIKE ?`).all(pattern);
+    const filesArr: Array<any> = db.prepare(`SELECT filePath FROM files WHERE filePath LIKE ?`).all(pattern);
 
-    return filesArr;
+    return filesArr.map(file => file.filePath);
   }
 
   createFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData): FilePersistenceData {
@@ -83,7 +76,6 @@ class SQLitePersistence implements Persistence {
         }
       }
     }
-
     return filePersistenceData;
   }
 
@@ -212,7 +204,7 @@ class SQLitePersistence implements Persistence {
 
   readInternalHasteMap(cachePath: string): InternalHasteMap {
     // Get database, throw if does not exist.
-    const db = this.getDatabase(cachePath, true);
+    const db = this.getDatabase(cachePath, false);
 
     // Create empty map to populate.
     const internalHasteMap: InternalHasteMap = {
@@ -266,7 +258,7 @@ class SQLitePersistence implements Persistence {
       serialized: string;
     }> = db.prepare(`SELECT * FROM duplicates`).all();
     for (const duplicate of duplicatesArr) {
-      internalHasteMap.duplicates.set(name, v8.deserialize(
+      internalHasteMap.duplicates.set(duplicate.name, v8.deserialize(
         new Buffer(duplicate.serialized),
       ) as any);
     }
@@ -300,12 +292,13 @@ class SQLitePersistence implements Persistence {
         stmt: betterSqlLite3.Statement,
         [name, mapItem]: [string, ModuleMapItem],
       ) => {
+        const params = [name,
+          ...mapItem[H.GENERIC_PLATFORM] || [null, null],
+          ...mapItem[H.NATIVE_PLATFORM] || [null, null],
+          ...mapItem[H.IOS_PLATFORM] || [null, null],
+          ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
         stmt.run(
-          name,
-          mapItem[H.GENERIC_PLATFORM] || [null, null],
-          mapItem[H.NATIVE_PLATFORM] || [null, null],
-          mapItem[H.IOS_PLATFORM] || [null, null],
-          mapItem[H.ANDROID_PLATFORM] || [null, null],
+          params
         );
       };
 
@@ -322,13 +315,13 @@ class SQLitePersistence implements Persistence {
         for (const file of removedFiles.values()) {
           removeMapItemStmt.run(file[H.ID]);
         }
-        const upsertFileStmt = db.prepare(
-          `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType) VALUES (?, ?, ?, ?, ?)`,
+        const upsertMapStmt = db.prepare(
+          `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
         for (const changedFile of changedFiles.values()) {
           if (changedFile[H.MODULE]) {
             const mapItem = internalHasteMap.map.get(changedFile[H.MODULE])!;
-            runMapStmt(upsertFileStmt, [changedFile[H.MODULE], mapItem]);
+            runMapStmt(upsertMapStmt, [changedFile[H.MODULE], mapItem]);
           }
         }
       }
@@ -351,21 +344,25 @@ class SQLitePersistence implements Persistence {
         for (const [name, duplicate] of internalHasteMap.duplicates) {
           insertDuplicateStmt.run(name, v8.serialize(duplicate));
         }
-      } else if (removedFiles.size) {
+      } else {
+        const deleteDuplicateStmt = db.prepare(
+          `DELETE FROM duplicates WHERE name = ?`,
+        );
+
+        for (const file of removedFiles) {
+          const moduleID = file[H.ID];
+          const duplicate = internalHasteMap.duplicates.get(moduleID);
+          if (!duplicate) {
+            deleteDuplicateStmt.run(moduleID);
+          }
+        }
+
         const upsertDuplicateStmt = db.prepare(
           `INSERT OR REPLACE INTO duplicates (name, serialized) VALUES (?, ?)`,
         );
-        const deleteDuplicateStmt = db.prepare(
-          `DELETE FROM duplicates WHERE name=?`,
-        );
-        for (const file of removedFiles.values()) {
-          const moduleID = file[H.ID];
-          const duplicate = internalHasteMap.duplicates.get(moduleID);
-          if (duplicate) {
-            upsertDuplicateStmt.run(name, v8.serialize(duplicate));
-          } else {
-            deleteDuplicateStmt.run(name);
-          }
+
+        for (const [name, duplicate] of internalHasteMap.duplicates) {
+          upsertDuplicateStmt.run(name, v8.serialize(duplicate));
         }
       }
 
@@ -392,44 +389,42 @@ class SQLitePersistence implements Persistence {
       fileMustExist: dbExists,
     });
 
-    if (dbExists === false) {
-      db.exec(`CREATE TABLE IF NOT EXISTS files(
-        filePath text PRIMARY KEY,
-        id text NOT NULL,
-        mtime integer NOT NULL,
-        size integer NOT NULL,
-        visited integer NOT NULL,
-        dependencies text NOT NULL,
-        sha1 text
-      );`);
+    db.exec(`CREATE TABLE IF NOT EXISTS files(
+      filePath text PRIMARY KEY,
+      id text NOT NULL,
+      mtime integer NOT NULL,
+      size integer NOT NULL,
+      visited integer NOT NULL,
+      dependencies text NOT NULL,
+      sha1 text
+    );`);
 
-      db.exec(`CREATE TABLE IF NOT EXISTS map(
-        name text NOT NULL,
-        genericPath text,
-        genericType integer,
-        nativePath text,
-        nativeType integer,
-        iosPath text,
-        iosType integer,
-        androidPath text,
-        androidType integer
-      );`);
+    db.exec(`CREATE TABLE IF NOT EXISTS map(
+      name text NOT NULL,
+      genericPath text,
+      genericType integer,
+      nativePath text,
+      nativeType integer,
+      iosPath text,
+      iosType integer,
+      androidPath text,
+      androidType integer
+    );`);
 
-      db.exec(`CREATE TABLE IF NOT EXISTS mocks(
-        name text PRIMARY KEY,
-        filePath text NOT NULL
-      );`);
+    db.exec(`CREATE TABLE IF NOT EXISTS mocks(
+      name text PRIMARY KEY,
+      filePath text NOT NULL
+    );`);
 
-      db.exec(`CREATE TABLE IF NOT EXISTS duplicates(
-        name text PRIMARY KEY,
-        serialized text NOT NULL
-      );`);
+    db.exec(`CREATE TABLE IF NOT EXISTS duplicates(
+      name text PRIMARY KEY,
+      serialized text NOT NULL
+    );`);
 
-      db.exec(`CREATE TABLE IF NOT EXISTS clocks(
-        relativeRoot text,
-        since text
-      );`);
-    }
+    db.exec(`CREATE TABLE IF NOT EXISTS clocks(
+      relativeRoot text,
+      since text
+    );`);
 
     return db;
   }

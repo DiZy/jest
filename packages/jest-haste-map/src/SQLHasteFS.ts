@@ -80,8 +80,22 @@ export default class SQLHasteFS implements HasteFS {
     }
   }
 
+  matchFilesBasedOnRelativePath(pattern: RegExp | string): Array<Config.Path> {
+    const files = SQLitePersistence.findFilePathsBasedOnPattern(this._cachePath, pattern.toString());
+    return files.map(file => fastPath.resolve(this._rootDir, file));
+  }
+
   matchFiles(pattern: RegExp | string): Array<Config.Path> {
-    return SQLitePersistence.findFilePathsBasedOnPattern(this._cachePath, pattern);
+    if (!(pattern instanceof RegExp)) {
+      pattern = new RegExp(pattern);
+    }
+    const files = [];
+    for (const file of this.getAbsoluteFileIterator()) {
+      if (pattern.test(file)) {
+        files.push(file);
+      }
+    }
+    return files;
   }
 
   // TODO; update this to not use getAbsoluteFileIterator

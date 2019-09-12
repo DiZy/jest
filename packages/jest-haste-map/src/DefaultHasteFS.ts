@@ -97,6 +97,20 @@ export default class DefaultHasteFS implements HasteFS{
     }
   }
 
+  matchFilesBasedOnRelativePath(pattern: RegExp | string): Array<Config.Path> {
+    if (!(pattern instanceof RegExp)) {
+      pattern = new RegExp(pattern);
+    }
+    const files = [];
+    for (const file of this._files.keys()) {
+      if (pattern.test(file)) {
+        const filePath = fastPath.resolve(this._rootDir, file);
+        files.push(filePath);
+      }
+    }
+    return files;
+  }
+
   matchFiles(pattern: RegExp | string): Array<Config.Path> {
     if (!(pattern instanceof RegExp)) {
       pattern = new RegExp(pattern);
