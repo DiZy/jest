@@ -50,7 +50,6 @@ import {
 } from './types';
 import getPersistence from './persistence/persistence';
 import HasteFS from './HasteFS';
-import { reject } from 'q';
 
 type HType = typeof H;
 
@@ -333,7 +332,6 @@ class HasteMap extends EventEmitter {
   static getCacheFilePath(
     tmpdir: Config.Path,
     name: string,
-    useSQLite?: boolean,
     ...extra: Array<string>
   ): string {
     const hash = createHash('md5').update(extra.join(''));
@@ -341,8 +339,7 @@ class HasteMap extends EventEmitter {
       tmpdir,
       [
         name.replace(/\W/g, '-'),
-        hash.digest('hex'),
-        getPersistence(useSQLite === true).getType()
+        hash.digest('hex')
       ].join('-'),
     );
   }

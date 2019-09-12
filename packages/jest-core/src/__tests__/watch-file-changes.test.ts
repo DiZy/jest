@@ -22,7 +22,7 @@ describe('Watch mode flows with changed files', () => {
   let watch: any;
   let pipe: NodeJS.ReadStream;
   let stdin: MockStdin;
-  const testDirectory = path.resolve(tmpdir(), 'jest-tmp');
+  const testDirectory = path.resolve(tmpdir(), 'jest-watch-file-changes-test');
   const fileTargetPath = path.resolve(testDirectory, 'lost-file.js');
   const fileTargetPath2 = path.resolve(
     testDirectory,
