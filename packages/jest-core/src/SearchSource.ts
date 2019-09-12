@@ -135,8 +135,11 @@ export default class SearchSource {
   }
 
   private _getAllTestPaths(testPathPattern?: string): SearchResult {
+    const files = testPathPattern ? 
+      this._context.hasteFS.matchFilesBasedOnRelativePath(testPathPattern) : 
+      this._context.hasteFS.getAllFiles();
     return this._filterTestPathsWithStats(
-      toTests(this._context, this._context.hasteFS.getAllFiles()),
+      toTests(this._context, files),
       testPathPattern,
     );
   }
