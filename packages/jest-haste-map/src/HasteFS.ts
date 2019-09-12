@@ -40,6 +40,8 @@ export default interface HasteFS {
 
   matchFiles: (pattern: RegExp | string) => Array<Config.Path>;
 
+  matchFilesBasedOnRelativePath: (pattern: RegExp | string) => Array<Config.Path>;
+
   matchFilesWithGlob: (
     globs: Array<Config.Glob>,
     root: Config.Path | null,

@@ -48,9 +48,8 @@ import {
   FilePersistenceData,
   ModuleMapItem,
 } from './types';
-import persistence from './persistence/persistence';
+import getPersistence from './persistence/persistence';
 import HasteFS from './HasteFS';
-import SQLHasteFS from './SQLHasteFS';
 
 type HType = typeof H;
 
@@ -77,6 +76,7 @@ type Options = {
   skipPackageJson?: boolean;
   throwOnModuleCollision?: boolean;
   useWatchman?: boolean;
+  useSQLite?: boolean;
   watch?: boolean;
 };
 
@@ -101,6 +101,7 @@ type InternalOptions = {
   skipPackageJson: boolean;
   throwOnModuleCollision: boolean;
   useWatchman: boolean;
+  useSQLite: boolean;
   watch: boolean;
 };
 
@@ -275,6 +276,7 @@ class HasteMap extends EventEmitter {
       skipPackageJson: !!options.skipPackageJson,
       throwOnModuleCollision: !!options.throwOnModuleCollision,
       useWatchman: options.useWatchman == null ? true : options.useWatchman,
+      useSQLite: options.useSQLite === true,
       watch: !!options.watch,
     };
     this._console = options.console || global.console;
@@ -330,6 +332,7 @@ class HasteMap extends EventEmitter {
   static getCacheFilePath(
     tmpdir: Config.Path,
     name: string,
+    useSQLite?: boolean,
     ...extra: Array<string>
   ): string {
     const hash = createHash('md5').update(extra.join(''));
@@ -338,7 +341,7 @@ class HasteMap extends EventEmitter {
       [
         name.replace(/\W/g, '-'),
         hash.digest('hex'),
-        persistence.getType(),
+        getPersistence(useSQLite === true).getType()
       ].join('-'),
     );
   }
@@ -358,10 +361,11 @@ class HasteMap extends EventEmitter {
         
         let hasteFS: HasteFS;
         // Avoid loading all files if sqlite is available
-        if (persistence.getType() === 'sqlite') {
+        if (getPersistence(this._options.useSQLite).getType() === 'sqlite') {
+          const SQLHasteFS = require('./SQLHasteFS').default;
           hasteFS = new SQLHasteFS(rootDir, this._cachePath);
         } else {
-          let existingFiles = persistence.readAllFiles(this._cachePath);
+          let existingFiles = getPersistence(this._options.useSQLite).readAllFiles(this._cachePath);
           hasteFS = new DefaultHasteFS({
             files: existingFiles,
             rootDir,
@@ -380,7 +384,7 @@ class HasteMap extends EventEmitter {
           hasteMap = buildHasteMapResults.hasteMap;
           const filePersistenceData = buildHasteMapResults.filePersistenceData;
           hasteFS.persistFileData(filePersistenceData, hasteMap);
-          persistence.writeInternalHasteMap(this._cachePath, hasteMap, filePersistenceData);
+          getPersistence(this._options.useSQLite).writeInternalHasteMap(this._cachePath, hasteMap, filePersistenceData);
         }
 
         const moduleMap = new HasteModuleMap({
@@ -409,7 +413,7 @@ class HasteMap extends EventEmitter {
     let hasteMap: InternalHasteMap;
 
     try {
-      hasteMap = persistence.readInternalHasteMap(this._cachePath);
+      hasteMap = getPersistence(this._options.useSQLite).readInternalHasteMap(this._cachePath);
     } catch (err) {
       hasteMap = this._createEmptyMap();
     }
