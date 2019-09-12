@@ -14,7 +14,7 @@ import { tmpdir } from 'os';
 import betterSqlLite3 from 'better-sqlite3';
 import rimraf = require('rimraf');
 
-const testDirectory = path.resolve(tmpdir(), 'jest-tmp');
+const testDirectory = path.resolve(tmpdir(), 'jest-index-sql-test');
 const cacheFilePath = path.resolve(testDirectory, 'project');
 
 function mockHashContents(contents) {
