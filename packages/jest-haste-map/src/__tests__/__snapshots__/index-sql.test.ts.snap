@@ -16,7 +16,7 @@ exports[`HasteMap file system changes processing recovery from duplicate module 
 "
 `;
 
-exports[`HasteMap throws on duplicate module ids if "throwOnModuleCollision" is set to true 1`] = `[TypeError: SQLHasteFS is not a constructor]`;
+exports[`HasteMap throws on duplicate module ids if "throwOnModuleCollision" is set to true 1`] = `[Error: Duplicated files or mocks. Please check the console for more info]`;
 
 exports[`HasteMap tries to crawl using node as a fallback 1`] = `
 "jest-haste-map: Watchman crawl failed. Retrying once with node crawler.
