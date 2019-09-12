@@ -219,6 +219,7 @@ export type InitialOptions = {
   watchPathIgnorePatterns?: Array<string>;
   unmockedModulePathPatterns?: Array<string>;
   updateSnapshot?: boolean;
+  useSQLite: boolean | null | undefined;
   useStderr?: boolean;
   verbose?: boolean | null | undefined;
   watch?: boolean;
@@ -350,6 +351,7 @@ export type GlobalConfig = {
   testSequencer: string;
   testTimeout: number;
   updateSnapshot: SnapshotUpdateState;
+  useSQLite: boolean | null | undefined;
   useStderr: boolean;
   verbose: boolean | null | undefined;
   watch: boolean;
@@ -418,6 +420,7 @@ export type ProjectConfig = {
   transformIgnorePatterns: Array<Glob>;
   watchPathIgnorePatterns: Array<string>;
   unmockedModulePathPatterns: Array<string> | null | undefined;
+  useSQLite: boolean | null | undefined;
 };
 
 export type Argv = Arguments<

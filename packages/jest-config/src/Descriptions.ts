@@ -86,6 +86,8 @@ const descriptions: {[key in keyof Config.InitialOptions]: string} = {
   transform: 'A map from regular expressions to paths to transformers',
   transformIgnorePatterns:
     'An array of regexp pattern strings that are matched against all source file paths, matched files will skip transformation',
+  useSQLite:
+    'Activates SQLite persistence for jest-haste-map',
   unmockedModulePathPatterns:
     'An array of regexp pattern strings that are matched against all modules before the module loader will automatically return a mock for them',
   verbose:

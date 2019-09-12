@@ -38,6 +38,7 @@ type HasteMapOptions = {
   console?: Console;
   maxWorkers: number;
   resetCache: boolean;
+  useSQLite?: boolean | null | undefined;
   watch?: boolean;
   watchman: boolean;
 };
@@ -201,6 +202,7 @@ class Runtime {
       console: options.console,
       maxWorkers: options.maxWorkers,
       resetCache: !config.cache,
+      useSQLite: config.useSQLite,
       watch: options.watch,
       watchman: options.watchman,
     });
@@ -250,6 +252,7 @@ class Runtime {
       rootDir: config.rootDir,
       roots: config.roots,
       throwOnModuleCollision: config.haste.throwOnModuleCollision,
+      useSQLite: options && options.useSQLite === true,
       useWatchman: options && options.watchman,
       watch: options && options.watch,
     });

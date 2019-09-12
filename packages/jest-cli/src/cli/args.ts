@@ -670,6 +670,11 @@ export const options = {
       'the pattern',
     type: 'boolean',
   },
+  useSQLite: {
+    default: undefined,
+    description: 'Use SQLite to store the haste-map',
+    type: 'boolean',
+  },
   useStderr: {
     default: undefined,
     description: 'Divert all output to stderr.',
