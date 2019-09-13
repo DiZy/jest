@@ -863,6 +863,7 @@ export default function normalize(
       case 'testNamePattern':
       case 'testURL':
       case 'timers':
+      case 'useSQLite':
       case 'useStderr':
       case 'verbose':
       case 'watch':
