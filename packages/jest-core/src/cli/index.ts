@@ -124,6 +124,7 @@ const buildContextsAndHasteMaps = async (
         console: new CustomConsole(outputStream, outputStream),
         maxWorkers: globalConfig.maxWorkers,
         resetCache: !config.cache,
+        useSQLite: globalConfig.useSQLite,
         watch: globalConfig.watch || globalConfig.watchAll,
         watchman: globalConfig.watchman,
       });
