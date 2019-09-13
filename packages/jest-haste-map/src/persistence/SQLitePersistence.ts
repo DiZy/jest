@@ -17,6 +17,10 @@ class SQLitePersistence implements Persistence {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
+    if(!pattern.includes("%")) {
+      pattern = "%" + pattern + "%";
+    }
+
     // Fetch files.
     const filesArr: Array<any> = db.prepare(`SELECT filePath FROM files WHERE filePath LIKE ?`).all(pattern);
 
