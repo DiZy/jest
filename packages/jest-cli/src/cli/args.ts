@@ -671,7 +671,7 @@ export const options = {
     type: 'boolean',
   },
   useSQLite: {
-    default: undefined,
+    default: false,
     description: 'Use SQLite to store the haste-map',
     type: 'boolean',
   },
