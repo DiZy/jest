@@ -130,7 +130,7 @@ const cleanup = (
   filesRemovedList: Array<string>;
 } => {
   const pattern = '\\.' + EXTENSION + '$';
-  const files = hasteFS.matchFiles(pattern);
+  const files = hasteFS.matchFilesBasedOnRelativePath(pattern);
   let testIgnorePatternsRegex: RegExp | null = null;
   if (testPathIgnorePatterns && testPathIgnorePatterns.length > 0) {
     testIgnorePatternsRegex = new RegExp(testPathIgnorePatterns.join('|'));
