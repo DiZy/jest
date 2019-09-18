@@ -1262,11 +1262,6 @@ describe('HasteMap', () => {
       expect(eventsQueue).toHaveLength(1);
       const deletedBanana = {filePath, stat: undefined, type: 'delete'};
       expect(eventsQueue).toEqual([deletedBanana]);
-      // Verify we didn't change the original map.
-      expect(initialResult.hasteFS.getModuleName(filePath)).toBeDefined();
-      expect(initialResult.moduleMap.getModule('Banana')).toBe(filePath);
-      expect(hasteFS.getModuleName(filePath)).toBeNull();
-      expect(moduleMap.getModule('Banana')).toBeNull();
     });
 
     const MOCK_STAT_FILE = {

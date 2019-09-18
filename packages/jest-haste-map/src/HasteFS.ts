@@ -10,7 +10,7 @@ import { FileMetaData, FileCrawlData, FilePersistenceData, FileData, WatchmanClo
 
 export default interface HasteFS {
 
-  readInternalHasteMap(): InternalHasteMap;
+  getFullInternalHasteMap(): InternalHasteMap;
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData;
 
@@ -74,4 +74,6 @@ export default interface HasteFS {
   clearModuleMap(): void;
 
   clearMocks(): void;
+
+  copyHasteMap(): void;
 }

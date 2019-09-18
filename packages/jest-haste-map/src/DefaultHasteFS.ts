@@ -25,7 +25,7 @@ export default class DefaultHasteFS implements HasteFS {
     this._cachePath = cachePath;
   }
 
-  readInternalHasteMap(): InternalHasteMap {
+  getFullInternalHasteMap(): InternalHasteMap {
     return this._hasteMap;
   }
 
@@ -54,11 +54,16 @@ export default class DefaultHasteFS implements HasteFS {
   }
 
   deleteFromModuleMap(moduleName: string, platform?: string): void {
-    if (platform && this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).includes(platform)) {
-      delete this._hasteMap.map.get(moduleName)![platform];
+    if(platform) {
+      if (this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).includes(platform)) {
+        delete this._hasteMap.map.get(moduleName)![platform];
+      }
+  
+      if(this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).length === 0) {
+        this._hasteMap.map.delete(moduleName);
+      }
     }
-
-    if(this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).length === 0) {
+    else {
       this._hasteMap.map.delete(moduleName);
     }
   }
@@ -202,6 +207,16 @@ export default class DefaultHasteFS implements HasteFS {
   getFileMetadata(file: Config.Path): FileMetaData | undefined {
     const relativePath = this._convertToRelativePath(file);
     return this._hasteMap.files.get(relativePath);
+  }
+
+  copyHasteMap(): void {
+    this._hasteMap = {
+      clocks: new Map(this._hasteMap.clocks),
+      duplicates: new Map(this._hasteMap.duplicates),
+      files: new Map(this._hasteMap.files),
+      map: new Map(this._hasteMap.map),
+      mocks: new Map(this._hasteMap.mocks),
+    };
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {

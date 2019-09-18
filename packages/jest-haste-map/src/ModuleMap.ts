@@ -35,7 +35,7 @@ export default class ModuleMap {
   private readonly _raw: RawModuleMap;
   private json: SerializableModuleMap | undefined;
 
-  private static mapToArrayRecursive(
+  protected static mapToArrayRecursive(
     map: Map<any, any>,
   ): Array<[string, unknown]> {
     let arr = Array.from(map);
@@ -96,15 +96,6 @@ export default class ModuleMap {
     const mockPath =
       this._raw.mocks.get(name) || this._raw.mocks.get(name + '/index');
     return mockPath && fastPath.resolve(this._raw.rootDir, mockPath);
-  }
-
-  getRawModuleMap(): RawModuleMap {
-    return {
-      duplicates: this._raw.duplicates,
-      map: this._raw.map,
-      mocks: this._raw.mocks,
-      rootDir: this._raw.rootDir,
-    };
   }
 
   toJSON(): SerializableModuleMap {
@@ -181,7 +172,7 @@ export default class ModuleMap {
     return null;
   }
 
-  private _assertNoDuplicates(
+  protected _assertNoDuplicates(
     name: string,
     platform: string,
     supportsNativePlatform: boolean,

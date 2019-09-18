@@ -23,7 +23,7 @@ export default class SQLHasteFS implements HasteFS {
     this._cachePath = cachePath;
   }
   
-  readInternalHasteMap(): InternalHasteMap {
+  getFullInternalHasteMap(): InternalHasteMap {
     return SQLitePersistence.readInternalHasteMap(this._cachePath);
   }
 
@@ -183,6 +183,10 @@ export default class SQLHasteFS implements HasteFS {
   deleteFileMetadata(file: Config.Path): void {
     const relativePath = this._convertToRelativePath(file);
     return SQLitePersistence.deleteFileMetadata(this._cachePath, relativePath);
+  }
+
+  copyHasteMap(): void {
+    // No need to copy locally because it is stored in SQL
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {

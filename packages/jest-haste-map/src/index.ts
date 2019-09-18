@@ -388,16 +388,10 @@ class HasteMap extends EventEmitter {
           hasteFS.persist(); // If not using sqlite, need to force persist at end
         }
 
-        const fullInternalHasteMap = hasteFS.readInternalHasteMap(); // remove later
+        const moduleMap = this.createHasteModuleMap(hasteFS);
 
-        const moduleMap = new HasteModuleMap({
-          duplicates: fullInternalHasteMap.duplicates,
-          map: fullInternalHasteMap.map,
-          mocks: fullInternalHasteMap.mocks,
-          rootDir,
-        });
         const __hasteMapForTest =
-          (process.env.NODE_ENV === 'test' && fullInternalHasteMap) || null;
+          (process.env.NODE_ENV === 'test' && hasteFS.getFullInternalHasteMap()) || null;
         await this._watch(hasteFS);
         return {
           __hasteMapForTest,
@@ -419,6 +413,21 @@ class HasteMap extends EventEmitter {
     }
 
     return hasteMap;
+  }
+
+  private createHasteModuleMap(hasteFS: HasteFS): HasteModuleMap{
+    if(getPersistence(this._options.useSQLite).getType() === 'sqlite') {
+      const SQLModuleMap = require('./SQLModuleMap').default;
+      return new SQLModuleMap(this._options.rootDir, this._cachePath);
+    }else {
+      const fullInternalHasteMap = hasteFS.getFullInternalHasteMap();
+      return new HasteModuleMap({
+        duplicates: fullInternalHasteMap.duplicates,
+        map: fullInternalHasteMap.map,
+        mocks: fullInternalHasteMap.mocks,
+        rootDir: this._options.rootDir,
+      });
+    }
   }
 
   private _processFile(
@@ -847,6 +856,7 @@ class HasteMap extends EventEmitter {
 
     let changeQueue: Promise<null | void> = Promise.resolve();
     let eventsQueue: EventsQueue = [];
+    let mustCopy = true;
 
     const createWatcher = (root: Config.Path): Promise<Watcher> => {
       // @ts-ignore: TODO how? "Cannot use 'new' with an expression whose type lacks a call or construct signature."
@@ -872,16 +882,11 @@ class HasteMap extends EventEmitter {
 
     const emitChange = () => {
       if (eventsQueue.length) {
-        const hasteMap = hasteFS.readInternalHasteMap();
+        mustCopy = true;
         const changeEvent: ChangeEvent = {
           eventsQueue,
           hasteFS,
-          moduleMap: new HasteModuleMap({
-            duplicates: hasteMap.duplicates,
-            map: hasteMap.map,
-            mocks: hasteMap.mocks,
-            rootDir,
-          }),
+          moduleMap: this.createHasteModuleMap(hasteFS),
         };
         this.emit('change', changeEvent);
         eventsQueue = [];
@@ -918,6 +923,11 @@ class HasteMap extends EventEmitter {
             )
           ) {
             return null;
+          }
+
+          if (mustCopy) {
+            mustCopy = false;
+            hasteFS.copyHasteMap();
           }
 
           const add = () => {
