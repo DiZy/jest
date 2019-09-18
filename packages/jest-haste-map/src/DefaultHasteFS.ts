@@ -8,44 +8,105 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileData, FileMetaData, FileCrawlData, FilePersistenceData, InternalHasteMap} from './types';
+import {FileData, FileMetaData, FileCrawlData, FilePersistenceData, InternalHasteMap, WatchmanClocks, DuplicatesIndex, ModuleMapItem} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
 import FilePersistence from './persistence/FilePersistence';
 
-export default class DefaultHasteFS implements HasteFS{
+export default class DefaultHasteFS implements HasteFS {
   private readonly _rootDir: Config.Path;
-  private _files: FileData;
+  private _hasteMap: InternalHasteMap;
   private readonly _cachePath: Config.Path;
 
-  constructor({rootDir, files, cachePath}: {rootDir: Config.Path; files: FileData; cachePath: Config.Path}) {
+  constructor({rootDir, initialHasteMap, cachePath}: {rootDir: Config.Path; initialHasteMap: InternalHasteMap; cachePath: Config.Path}) {
     this._rootDir = rootDir;
-    this._files = files;
+    this._hasteMap = initialHasteMap;
     this._cachePath = cachePath;
   }
 
-  createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
-    return FilePersistence.createFilePersistenceData(this._cachePath, fileCrawlData, this._files);
+  readInternalHasteMap(): InternalHasteMap {
+    return this._hasteMap;
   }
 
-  persistFileData(filePersistenceData: FilePersistenceData, hasteMap: InternalHasteMap): void {
-    FilePersistence.writeFileData(this._cachePath, filePersistenceData, hasteMap);
-    try {
-      this._files = filePersistenceData.finalFiles!;
-    } catch {
-      throw new Error("FilePersistence persistFileData was called without finalFiles");
+  getClocks(): WatchmanClocks {
+    return this._hasteMap.clocks;
+  }
+
+  setClocks(clocks: WatchmanClocks): void {
+    this._hasteMap.clocks = clocks;
+  }
+
+  getDuplicates(): DuplicatesIndex {
+    return this._hasteMap.duplicates;
+  }
+  
+  setDuplicates(duplicates: DuplicatesIndex): void {
+    this._hasteMap.duplicates = duplicates;
+  }
+
+  getFromModuleMap(moduleName: string): ModuleMapItem | undefined {
+    return this._hasteMap.map.get(moduleName);
+  }
+
+  setInModuleMap(moduleName: string, moduleMapItem: ModuleMapItem): void {
+    this._hasteMap.map.set(moduleName, moduleMapItem);
+  }
+
+  deleteFromModuleMap(moduleName: string, platform?: string): void {
+    if (platform && this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).includes(platform)) {
+      delete this._hasteMap.map.get(moduleName)![platform];
     }
+
+    if(this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).length === 0) {
+      this._hasteMap.map.delete(moduleName);
+    }
+  }
+
+  deleteFromMocks(mockName: string): void {
+    this._hasteMap.mocks.delete(mockName);
+  }
+
+  getMock(mockPath: string): string | undefined{
+    return this._hasteMap.mocks.get(mockPath);
+  }
+
+  setMock(mockPath: string, relativeFilePath: string): void {
+    this._hasteMap.mocks.set(mockPath, relativeFilePath);
+  }
+
+  clearModuleMap(): void {
+    this._hasteMap.map = new Map();
+  }
+
+  clearMocks(): void {
+    this._hasteMap.mocks = new Map();
+  }
+
+  createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
+    return FilePersistence.createFilePersistenceData(this._cachePath, fileCrawlData, this._hasteMap.files);
+  }
+
+  updateFileData(filePersistenceData: FilePersistenceData) {
+    try {
+      this._hasteMap.files = filePersistenceData.finalFiles!;
+    } catch {
+      throw new Error("FilePersistence updateFileData was called without finalFiles");
+    }
+  }
+
+  persist(): void {
+    FilePersistence.persist(this._cachePath, this._hasteMap);
   }
 
   setFileMetadata(filePath: string, fileMetadata: FileMetaData): void {
     const relativePath = this._convertToRelativePath(filePath);
-    this._files.set(relativePath, fileMetadata);
+    this._hasteMap.files.set(relativePath, fileMetadata);
   }
 
   deleteFileMetadata(filePath: string): void {
     const relativePath = this._convertToRelativePath(filePath);
-    this._files.delete(relativePath);
+    this._hasteMap.files.delete(relativePath);
   }
 
   getModuleName(file: Config.Path): string | null {
@@ -80,7 +141,7 @@ export default class DefaultHasteFS implements HasteFS{
   }
 
   getAllFilesMap(): FileData {
-    return this._files;
+    return this._hasteMap.files;
   }
 
   getAllFiles(): Array<Config.Path> {
@@ -88,7 +149,7 @@ export default class DefaultHasteFS implements HasteFS{
   }
 
   getFileIterator(): Iterable<Config.Path> {
-    return this._files.keys();
+    return this._hasteMap.files.keys();
   }
 
   *getAbsoluteFileIterator(): Iterable<Config.Path> {
@@ -102,7 +163,7 @@ export default class DefaultHasteFS implements HasteFS{
       pattern = new RegExp(pattern);
     }
     const files = [];
-    for (const file of this._files.keys()) {
+    for (const file of this._hasteMap.files.keys()) {
       if (pattern.test(file)) {
         const filePath = fastPath.resolve(this._rootDir, file);
         files.push(filePath);
@@ -140,7 +201,7 @@ export default class DefaultHasteFS implements HasteFS{
 
   getFileMetadata(file: Config.Path): FileMetaData | undefined {
     const relativePath = this._convertToRelativePath(file);
-    return this._files.get(relativePath);
+    return this._hasteMap.files.get(relativePath);
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {

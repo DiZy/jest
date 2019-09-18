@@ -52,8 +52,6 @@ jest.mock('../crawlers/watchman', () =>
     const removedFiles = new Set();
     const changedFiles = new Map();
 
-    data.clocks = mockClocks;
-
     for (const file in list) {
       if (new RegExp(roots.join('|')).test(file) && !ignore(file)) {
         const relativeFilePath = path.relative(rootDir, file);
@@ -68,12 +66,10 @@ jest.mock('../crawlers/watchman', () =>
     }
 
     return Promise.resolve({
-      data: {
-        changedFiles,
-        isFresh: false,
-        removedFiles,
-      },
-      hasteMap: data,
+      changedFiles,
+      isFresh: false,
+      removedFiles,
+      newClocks: mockClocks,
     });
   }),
 );
@@ -448,12 +444,9 @@ describe('HasteMap', () => {
           });
 
           return Promise.resolve({
-            data: {
-              changedFiles,
-              isFresh: true,
-              removedFiles: new Map(),
-            },
-            hasteMap: data,
+            changedFiles,
+            isFresh: true,
+            removedFiles: new Map(),
           });
         });
 
@@ -1009,12 +1002,10 @@ describe('HasteMap', () => {
       mockImpl(options).then(() => {
         const path = require('path');
 
-        const {data, ignore, rootDir, roots, computeSha1} = options;
+        const {ignore, rootDir, roots, computeSha1} = options;
         const list = mockChangedFiles || mockFs;
         const removedFiles = new Set();
         const changedFiles = new Map();
-
-        data.clocks = mockClocks;
 
         for (const file in list) {
           if (new RegExp(roots.join('|')).test(file) && !ignore(file)) {
@@ -1038,12 +1029,10 @@ describe('HasteMap', () => {
           size: 44,
         });
         return {
-          data: {
-            changedFiles,
-            isFresh: false,
-            removedFiles: new Set(),
-          },
-          hasteMap: data,
+          changedFiles,
+          isFresh: false,
+          removedFiles: new Set(),
+          newClocks: mockClocks,
         };
       }),
     );
@@ -1149,12 +1138,9 @@ describe('HasteMap', () => {
         },
       });
       return Promise.resolve({
-        data: {
-          changedFiles,
-          isFresh: true,
-          removedFiles: new Set(),
-        },
-        hasteMap: data,
+        changedFiles,
+        isFresh: true,
+        removedFiles: new Set(),
       });
     });
 
@@ -1192,12 +1178,9 @@ describe('HasteMap', () => {
         },
       });
       return Promise.resolve({
-        data: {
-          changedFiles,
-          isFresh: true,
-          removedFiles: new Set(),
-        },
-        hasteMap: data,
+        changedFiles,
+        isFresh: true,
+        removedFiles: new Set(),
       });
     });
 

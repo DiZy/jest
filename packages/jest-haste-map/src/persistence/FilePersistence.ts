@@ -4,16 +4,7 @@ import H from '../constants';
 
 class FilePersistence implements Persistence {
   readInternalHasteMap(cachePath: string): InternalHasteMap {
-    return serializer.readFileSync(cachePath).internalHasteMap;
-  }
-
-  readAllFiles(cachePath: string): FileData {
-    try {
-      return serializer.readFileSync(cachePath).files;
-    }
-    catch {
-      return new Map<string, FileMetaData>();
-    }
+    return serializer.readFileSync(cachePath);
   }
 
   createFilePersistenceData(_cachePath: string, fileCrawlData: FileCrawlData, oldFiles?: FileData): FilePersistenceData {
@@ -81,21 +72,8 @@ class FilePersistence implements Persistence {
     return filePersistenceData;
   }
 
-  writeFileData(cachePath: string, data: FilePersistenceData, hasteMap: InternalHasteMap): void {
-    serializer.writeFileSync(cachePath, {internalHasteMap: hasteMap, files: data.finalFiles!});
-  }
-
-  writeInternalHasteMap(
-    cachePath: string,
-    internalHasteMap: InternalHasteMap,
-    fileData: FilePersistenceData): void {
-
-    try{ 
-      const files = fileData.finalFiles!;
-      serializer.writeFileSync(cachePath, {internalHasteMap, files});
-    } catch {
-      throw new Error("FilePersistence writeInternalHasteMap was called without finalFiles");
-    }
+  persist(cachePath: string, internalHasteMap: InternalHasteMap): void {
+    serializer.writeFileSync(cachePath, internalHasteMap);
   }
 
   getType() {

@@ -12,7 +12,6 @@ import * as fastPath from '../lib/fast_path';
 import {
   CrawlerOptions,
   IgnoreMatcher,
-  InternalHasteMap,
   FileCrawlData,
   ChangedFileMetadata,
 } from '../types';
@@ -135,12 +134,8 @@ function findNative(
 
 export = function nodeCrawl(
   options: CrawlerOptions,
-): Promise<{
-  data: FileCrawlData;
-  hasteMap: InternalHasteMap;
-}> {
+): Promise<FileCrawlData> {
   const {
-    data,
     extensions,
     forceNodeFilesystemAPI,
     ignore,
@@ -158,12 +153,9 @@ export = function nodeCrawl(
       });
 
       resolve({
-        data: {
-          isFresh: true,
-          removedFiles: new Set<string>(),
-          changedFiles,
-        },
-        hasteMap: data,
+        isFresh: true,
+        removedFiles: new Set<string>(),
+        changedFiles,
       });
     };
 
