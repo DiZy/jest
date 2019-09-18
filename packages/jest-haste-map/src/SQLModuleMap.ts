@@ -13,6 +13,7 @@ import SQLitePersistence from './persistence/SQLitePersistence';
 
 const EMPTY_OBJ = {} as Record<string, any>;
 const EMPTY_MAP = new Map();
+const NON_EXISTENT_MOCK = "MOCK_DOES_NOT_EXIST";
 
 export default class SQLModuleMap extends ModuleMap {
     private readonly _cachePath: Config.Path;
@@ -63,6 +64,10 @@ export default class SQLModuleMap extends ModuleMap {
   
     getMockModule(name: string): Config.Path | undefined {
       let mockPath = this._sqlCache.mocks.get(name);
+      if(mockPath === NON_EXISTENT_MOCK) {
+        return undefined;
+      }
+
       if (!mockPath) {
         mockPath = SQLitePersistence.getMock(this._cachePath, name);
       }
@@ -70,9 +75,7 @@ export default class SQLModuleMap extends ModuleMap {
         mockPath = SQLitePersistence.getMock(this._cachePath, name + '/index');
       };
 
-      if(mockPath) {
-        this._sqlCache.mocks.set(name, mockPath);
-      }
+      this._sqlCache.mocks.set(name, mockPath || NON_EXISTENT_MOCK);
       return mockPath && fastPath.resolve(this._rootDir, mockPath);
     }
   

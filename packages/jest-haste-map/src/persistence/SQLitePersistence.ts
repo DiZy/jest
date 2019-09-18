@@ -515,6 +515,10 @@ class SQLitePersistence implements Persistence {
       since text
     );`);
 
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_map_name ON map(name);`)
+
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mock_name ON mocks(name);`)
+
     return db;
   }
 
