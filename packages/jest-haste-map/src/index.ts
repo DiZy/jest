@@ -352,7 +352,6 @@ class HasteMap extends EventEmitter {
         const rootDir = this._options.rootDir;
 
         let hasteFS: HasteFS;
-        
         // Avoid full file read if sqlite is available
         if (getPersistence(this._options.useSQLite).getType() === 'sqlite') {
           const SQLHasteFS = require('./SQLHasteFS').default;
