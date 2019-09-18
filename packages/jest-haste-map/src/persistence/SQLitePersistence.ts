@@ -9,6 +9,8 @@ import {
   ModuleMapItem,
   FileCrawlData,
   FilePersistenceData,
+  WatchmanClocks,
+  DuplicatesIndex,
 } from '../types';
 import H from '../constants';
 
@@ -216,7 +218,10 @@ class SQLitePersistence implements Persistence {
       mocks: new Map(),
       duplicates: new Map(),
       clocks: new Map(),
+      files: new Map(),
     };
+
+    internalHasteMap.files = this.readAllFiles(cachePath);
 
     // Fetch map.
     const mapsArr: Array<{
@@ -244,6 +249,7 @@ class SQLitePersistence implements Persistence {
       if (map.androidPath !== null && map.androidType !== null) {
         mapItem[H.ANDROID_PLATFORM] = [map.androidPath, map.androidType];
       }
+
       internalHasteMap.map.set(map.name, mapItem);
     }
 
@@ -256,25 +262,9 @@ class SQLitePersistence implements Persistence {
       internalHasteMap.mocks.set(mock.name, mock.filePath);
     }
 
-    // Fetch duplicates.
-    const duplicatesArr: Array<{
-      name: string;
-      serialized: string;
-    }> = db.prepare(`SELECT * FROM duplicates`).all();
-    for (const duplicate of duplicatesArr) {
-      internalHasteMap.duplicates.set(duplicate.name, v8.deserialize(
-        new Buffer(duplicate.serialized),
-      ) as any);
-    }
+    internalHasteMap.duplicates = this.getDuplicates(cachePath);
 
-    // Fetch clocks.
-    const clocksArr: Array<{
-      relativeRoot: string;
-      since: string;
-    }> = db.prepare(`SELECT * FROM clocks`).all();
-    for (const clock of clocksArr) {
-      internalHasteMap.clocks.set(clock.relativeRoot, clock.since);
-    }
+    internalHasteMap.clocks = this.getClocks(cachePath);
 
     // Close database connection,
     db.close();
@@ -282,105 +272,200 @@ class SQLitePersistence implements Persistence {
     return internalHasteMap;
   }
 
-  writeInternalHasteMap(
-    cachePath: string,
-    internalHasteMap: InternalHasteMap,
-    data: FilePersistenceData,
-  ): void {
-    const db = this.getDatabase(cachePath, false);
-    const {changedFiles, removedFiles, isFresh} = data;
+  setDuplicates(cachePath: string, duplicates: DuplicatesIndex): void {
+    const db = this.getDatabase(cachePath, true);
+    db.exec('DELETE FROM duplicates');
+    const insertDuplicateStmt = db.prepare(
+      `INSERT INTO duplicates (name, serialized) VALUES (?, ?)`,
+    );
+    for (const [name, duplicate] of duplicates) {
+      insertDuplicateStmt.run(name, v8.serialize(duplicate));
+    }
+    db.close();
+  }
 
-    db.transaction(() => {
-      // Incrementally update map.
-      const runMapStmt = (
-        stmt: betterSqlLite3.Statement,
-        [name, mapItem]: [string, ModuleMapItem],
-      ) => {
-        const params = [name,
-          ...mapItem[H.GENERIC_PLATFORM] || [null, null],
-          ...mapItem[H.NATIVE_PLATFORM] || [null, null],
-          ...mapItem[H.IOS_PLATFORM] || [null, null],
-          ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
-        stmt.run(
-          params
-        );
-      };
+  setInModuleMap(cachePath: string, moduleName: string, moduleMapItem: ModuleMapItem): void {
+    const db = this.getDatabase(cachePath, true);
+    const runMapStmt = (
+      stmt: betterSqlLite3.Statement,
+      [name, mapItem]: [string, ModuleMapItem],
+    ) => {
+      const params = [name,
+        ...mapItem[H.GENERIC_PLATFORM] || [null, null],
+        ...mapItem[H.NATIVE_PLATFORM] || [null, null],
+        ...mapItem[H.IOS_PLATFORM] || [null, null],
+        ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
+      stmt.run(
+        params
+      );
+    };
+    const upsertMapStmt = db.prepare(
+      `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    runMapStmt(upsertMapStmt, [moduleName, moduleMapItem]);
+    db.close();
+  }
 
-      if (isFresh) {
-        db.exec('DELETE FROM map');
-        const insertMapItem = db.prepare(
-          `INSERT INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        );
-        for (const mapItem of internalHasteMap.map) {
-          runMapStmt(insertMapItem, mapItem);
-        }
-      } else {
-        const removeMapItemStmt = db.prepare(`DELETE FROM map WHERE name=?`);
-        for (const file of removedFiles.values()) {
-          removeMapItemStmt.run(file[H.ID]);
-        }
+  setMock(cachePath: string, name: string, filePath: string) {
+    const db = this.getDatabase(cachePath, true);
+    const insertMock = db.prepare(
+      `INSERT OR REPLACE INTO mocks (name, filePath) VALUES (?, ?)`,
+    );
+    insertMock.run(name, filePath);
+    db.close();
+  }
+
+  setClocks(cachePath: string, clocks: WatchmanClocks): void {
+    const db = this.getDatabase(cachePath, true);
+    // Replace clocks.
+    db.exec('DELETE FROM clocks');
+    const insertClock = db.prepare(
+      `INSERT INTO clocks (relativeRoot, since) VALUES (?, ?)`,
+    );
+    for (const [relativeRoot, since] of clocks) {
+      insertClock.run(relativeRoot, since);
+    }
+    db.close();
+  }
+
+  clearMocks(cachePath: string) {
+    const db = this.getDatabase(cachePath, true);
+    db.exec('DELETE FROM mocks');
+    db.close();
+  }
+
+  clearModuleMap(cachePath: string) {
+    const db = this.getDatabase(cachePath, true);
+    db.exec('DELETE FROM map');
+    db.close();
+  }
+
+  deleteFromModuleMap(cachePath: string, name: string, platform?: string) {
+    const db = this.getDatabase(cachePath, true);
+    if(platform) {
+      const moduleItem = this.getFromModuleMap(cachePath, name);
+      if (moduleItem && Object.keys(moduleItem).includes(platform)) {
+        delete moduleItem[platform];
+      }
+
+      if(moduleItem && Object.keys(moduleItem).length === 0) {
+        // delete if empty
+        db.prepare('DELETE FROM map where name = ?').run(name);
+      } else if (moduleItem) {
+        // update otherwise
+        const runMapStmt = (
+          stmt: betterSqlLite3.Statement,
+          [name, mapItem]: [string, ModuleMapItem],
+        ) => {
+          const params = [name,
+            ...mapItem[H.GENERIC_PLATFORM] || [null, null],
+            ...mapItem[H.NATIVE_PLATFORM] || [null, null],
+            ...mapItem[H.IOS_PLATFORM] || [null, null],
+            ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
+          stmt.run(
+            params
+          );
+        };
         const upsertMapStmt = db.prepare(
           `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         );
-        for (const changedFile of changedFiles.values()) {
-          if (changedFile[H.MODULE]) {
-            const mapItem = internalHasteMap.map.get(changedFile[H.MODULE])!;
-            runMapStmt(upsertMapStmt, [changedFile[H.MODULE], mapItem]);
-          }
-        }
+        runMapStmt(upsertMapStmt, [name, moduleItem]);
       }
+    }
+    else {
+      db.prepare('DELETE FROM map where name = ?').run(name);
+    }
+    db.close();
+  }
 
-      // Replace mocks.
-      db.exec('DELETE FROM mocks');
-      const insertMock = db.prepare(
-        `INSERT INTO mocks (name, filePath) VALUES (?, ?)`,
-      );
-      for (const [name, filePath] of internalHasteMap.mocks) {
-        insertMock.run(name, filePath);
-      }
+  deleteFromMocks(cachePath: string, name: string) {
+    const db = this.getDatabase(cachePath, true);
+    db.prepare('DELETE FROM mocks where name = ?').run(name);
+    db.close();
+  }
 
-      // Incrementally update duplicates.
-      if (isFresh) {
-        db.exec('DELETE FROM duplicates');
-        const insertDuplicateStmt = db.prepare(
-          `INSERT INTO duplicates (name, serialized) VALUES (?, ?)`,
-        );
-        for (const [name, duplicate] of internalHasteMap.duplicates) {
-          insertDuplicateStmt.run(name, v8.serialize(duplicate));
-        }
-      } else {
-        const deleteDuplicateStmt = db.prepare(
-          `DELETE FROM duplicates WHERE name = ?`,
-        );
+  getClocks(cachePath: string): WatchmanClocks {
+    // Fetch clocks.
+    const db = this.getDatabase(cachePath, false);
+    const clocks: WatchmanClocks = new Map();
+    const clocksArr: Array<{
+      relativeRoot: string;
+      since: string;
+    }> = db.prepare(`SELECT * FROM clocks`).all();
+    for (const clock of clocksArr) {
+      clocks.set(clock.relativeRoot, clock.since);
+    }
+    db.close();
+    return clocks;
+  }
 
-        for (const file of removedFiles) {
-          const moduleID = file[H.ID];
-          const duplicate = internalHasteMap.duplicates.get(moduleID);
-          if (!duplicate) {
-            deleteDuplicateStmt.run(moduleID);
-          }
-        }
-
-        const upsertDuplicateStmt = db.prepare(
-          `INSERT OR REPLACE INTO duplicates (name, serialized) VALUES (?, ?)`,
-        );
-
-        for (const [name, duplicate] of internalHasteMap.duplicates) {
-          upsertDuplicateStmt.run(name, v8.serialize(duplicate));
-        }
-      }
-
-      // Replace clocks.
-      db.exec('DELETE FROM clocks');
-      const insertClock = db.prepare(
-        `INSERT INTO clocks (relativeRoot, since) VALUES (?, ?)`,
-      );
-      for (const [relativeRoot, since] of internalHasteMap.clocks) {
-        insertClock.run(relativeRoot, since);
-      }
-    })();
+  getMock(cachePath: string, name: string): string | undefined {
+    const db = this.getDatabase(cachePath, false);
+    // Fetch mocks.
+    const mock: {
+      name: string;
+      filePath: string;
+    } | undefined = db.prepare(`SELECT * FROM mocks where name = ?`).get(name);
 
     db.close();
+
+    return mock ? mock.filePath : undefined;
+  }
+
+  getFromModuleMap(cachePath: string, name: string): ModuleMapItem | undefined {
+    const db = this.getDatabase(cachePath, false);
+    // Fetch map.
+    const map: {
+      name: string;
+      genericPath: string | null;
+      genericType: number | null;
+      nativePath: string | null;
+      nativeType: number | null;
+      iosPath: string | null;
+      iosType: number | null;
+      androidPath: string | null;
+      androidType: number | null;
+    } | undefined = db.prepare(`SELECT * FROM map WHERE name = ?`).get(name);
+
+    if(!map) {
+      return undefined;
+    }
+
+    const mapItem: {[key: string]: [string, number]} = {};
+    if (map.genericPath !== null && map.genericType !== null) {
+      mapItem[H.GENERIC_PLATFORM] = [map.genericPath, map.genericType];
+    }
+    if (map.nativePath !== null && map.nativeType !== null) {
+      mapItem[H.NATIVE_PLATFORM] = [map.nativePath, map.nativeType];
+    }
+    if (map.iosPath !== null && map.iosType !== null) {
+      mapItem[H.IOS_PLATFORM] = [map.iosPath, map.iosType];
+    }
+    if (map.androidPath !== null && map.androidType !== null) {
+      mapItem[H.ANDROID_PLATFORM] = [map.androidPath, map.androidType];
+    }
+
+    db.close();
+
+    return mapItem;
+  }
+
+  getDuplicates(cachePath: string) {
+    const db = this.getDatabase(cachePath, false);
+    const duplicates : DuplicatesIndex = new Map();
+
+    // Fetch duplicates.
+    const duplicatesArr: Array<{
+      name: string;
+      serialized: string;
+    }> = db.prepare(`SELECT * FROM duplicates`).all();
+    for (const duplicate of duplicatesArr) {
+      duplicates.set(duplicate.name, v8.deserialize(
+        new Buffer(duplicate.serialized),
+      ) as any);
+    }
+
+    return duplicates;
   }
 
   private getDatabase(cachePath: string, mustExist: boolean) {
@@ -404,7 +489,7 @@ class SQLitePersistence implements Persistence {
     );`);
 
     db.exec(`CREATE TABLE IF NOT EXISTS map(
-      name text NOT NULL,
+      name text NOT NULL PRIMARY KEY,
       genericPath text,
       genericType integer,
       nativePath text,

@@ -13,7 +13,6 @@ import normalizePathSep from '../lib/normalizePathSep';
 
 import {
   CrawlerOptions,
-  InternalHasteMap,
   FileCrawlData,
   ChangedFileMetadata,
 } from '../types';
@@ -32,18 +31,14 @@ function WatchmanError(error: Error): Error {
 
 export = async function watchmanCrawl(
   options: CrawlerOptions,
-): Promise<{
-  data: FileCrawlData;
-  hasteMap: InternalHasteMap;
-}> {
+): Promise<FileCrawlData> {
   const fields = ['name', 'exists', 'mtime_ms', 'size'];
-  const {data, extensions, ignore, rootDir, roots} = options;
+  const {clocks, extensions, ignore, rootDir, roots} = options;
   const defaultWatchExpression = [
     'allof',
     ['type', 'f'],
     ['anyof', ...extensions.map(extension => ['suffix', extension])],
   ];
-  const clocks = data.clocks;
   const client = new watchman.Client();
 
   let clientError;
@@ -211,11 +206,9 @@ export = async function watchmanCrawl(
   }
 
   return {
-    hasteMap: data,
-    data: {
-      removedFiles,
-      isFresh,
-      changedFiles,
-    },
+    removedFiles,
+    isFresh,
+    changedFiles,
+    newClocks: clocks,
   };
 };

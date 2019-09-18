@@ -8,7 +8,7 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileMetaData, FileCrawlData, FilePersistenceData, FileData} from './types';
+import {FileMetaData, FileCrawlData, FilePersistenceData, FileData, WatchmanClocks, DuplicatesIndex, ModuleMapItem, InternalHasteMap} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
@@ -22,14 +22,71 @@ export default class SQLHasteFS implements HasteFS {
     this._rootDir = rootDir;
     this._cachePath = cachePath;
   }
+  
+  readInternalHasteMap(): InternalHasteMap {
+    return SQLitePersistence.readInternalHasteMap(this._cachePath);
+  }
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
     return SQLitePersistence.createFilePersistenceData(this._cachePath, fileCrawlData);
   }
 
-  persistFileData(data: FilePersistenceData): void {
+  updateFileData(data: FilePersistenceData): void {
     return SQLitePersistence.writeFileData(this._cachePath, data);
   };
+
+  persist(): void {
+    // SQL data is already persisted
+    return;
+  }
+  
+  getClocks(): WatchmanClocks {
+    return SQLitePersistence.getClocks(this._cachePath);
+  }
+
+  setClocks(clocks: WatchmanClocks): void {
+    SQLitePersistence.setClocks(this._cachePath, clocks);
+  }
+
+  getDuplicates(): DuplicatesIndex {
+    return SQLitePersistence.getDuplicates(this._cachePath);
+  }
+
+  setDuplicates(duplicates: DuplicatesIndex): void {
+    SQLitePersistence.setDuplicates(this._cachePath, duplicates);
+  }
+
+  getFromModuleMap(moduleName: string): ModuleMapItem | undefined {
+    return SQLitePersistence.getFromModuleMap(this._cachePath, moduleName);
+  }
+
+  setInModuleMap(moduleName: string, moduleMapItem: ModuleMapItem): void {
+    SQLitePersistence.setInModuleMap(this._cachePath, moduleName, moduleMapItem);
+  }
+
+  deleteFromModuleMap(moduleName: string, platform?: string | undefined): void {
+    SQLitePersistence.deleteFromModuleMap(this._cachePath, moduleName, platform);
+  }
+
+  deleteFromMocks(mockName: string): void {
+    SQLitePersistence.deleteFromMocks(this._cachePath, mockName);
+  }
+
+  getMock(mockPath: string): string | undefined {
+    return SQLitePersistence.getMock(this._cachePath, mockPath);
+  }
+
+  setMock(mockPath: string, relativeFilePath: string): void {
+    SQLitePersistence.setMock(this._cachePath, mockPath, relativeFilePath);
+  }
+
+  clearModuleMap(): void {
+    SQLitePersistence.clearModuleMap(this._cachePath);
+  }
+
+  clearMocks(): void {
+    SQLitePersistence.clearMocks(this._cachePath);
+  }
 
   getModuleName(file: Config.Path): string | null {
     const fileMetadata = this.getFileMetadata(file);

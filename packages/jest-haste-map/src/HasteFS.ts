@@ -6,13 +6,17 @@
  */
 
 import {Config} from '@jest/types';
-import { FileMetaData, FileCrawlData, FilePersistenceData, FileData, InternalHasteMap } from './types';
+import { FileMetaData, FileCrawlData, FilePersistenceData, FileData, WatchmanClocks, DuplicatesIndex, ModuleMapItem, InternalHasteMap } from './types';
 
 export default interface HasteFS {
 
+  readInternalHasteMap(): InternalHasteMap;
+
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData;
 
-  persistFileData(filePersistenceData: FilePersistenceData, hasteMap: InternalHasteMap): void;
+  updateFileData(filePersistenceData: FilePersistenceData): void;
+
+  persist(): void;
 
   getModuleName: (file: Config.Path) => string | null;
 
@@ -46,4 +50,28 @@ export default interface HasteFS {
     globs: Array<Config.Glob>,
     root: Config.Path | null,
   ) => Set<Config.Path>;
+
+  getClocks: () => WatchmanClocks;
+
+  setClocks(clocks: WatchmanClocks): void;
+
+  getDuplicates: () => DuplicatesIndex;
+
+  setDuplicates(duplicates: DuplicatesIndex): void;
+
+  getFromModuleMap(moduleName: string): ModuleMapItem | undefined;
+
+  setInModuleMap(moduleName: string, moduleMapItem: ModuleMapItem): void;
+
+  deleteFromModuleMap(moduleName: string, platform?: string): void;
+
+  deleteFromMocks(mockName: string): void;
+
+  getMock(mockPath: string): string | undefined;
+
+  setMock(mockPath: string, relativeFilePath: string): void;
+
+  clearModuleMap(): void;
+
+  clearMocks(): void;
 }

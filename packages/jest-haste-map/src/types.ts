@@ -31,7 +31,7 @@ export type WorkerMetadata = {
 
 export type CrawlerOptions = {
   computeSha1: boolean;
-  data: InternalHasteMap;
+  clocks: WatchmanClocks;
   extensions: Array<string>;
   forceNodeFilesystemAPI: boolean;
   ignore: IgnoreMatcher;
@@ -66,6 +66,7 @@ export type DuplicatesIndex = Map<string, Map<string, DuplicatesSet>>;
 export type InternalHasteMap = {
   clocks: WatchmanClocks;
   duplicates: DuplicatesIndex;
+  files: FileData;
   map: ModuleMapData;
   mocks: MockData;
 };
@@ -128,6 +129,7 @@ export type FileCrawlData = {
   removedFiles: Set<Config.Path>,
   changedFiles: Map<Config.Path, ChangedFileMetadata>, // Contains only new information
   isFresh: boolean,
+  newClocks?: WatchmanClocks,
 };
 
 export type FilePersistenceData = {
@@ -139,13 +141,6 @@ export type FilePersistenceData = {
 
 export interface Persistence {
   createFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData, oldFiles?: FileData): FilePersistenceData
-  writeFileData(cachePath: string, data: FilePersistenceData, hasteMap: InternalHasteMap): void;
-  writeInternalHasteMap(
-    cachePath: string,
-    internalHasteMap: InternalHasteMap,
-    fileData: FilePersistenceData,
-  ): void;
   readInternalHasteMap(cachePath: string): InternalHasteMap;
-  readAllFiles(cachePath: string): FileData;
   getType(): string;
 };
