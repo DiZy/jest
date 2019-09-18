@@ -114,7 +114,7 @@ describe('node crawler', () => {
       ignore: pearMatcher,
       rootDir,
       roots: ['/project/fruits', '/project/vegtables'],
-    }).then(({hasteMap, data: {removedFiles, changedFiles, isFresh}}) => {
+    }).then(({removedFiles, changedFiles, isFresh}) => {
       expect(childProcess.spawn).lastCalledWith('find', [
         '/project/fruits',
         '/project/vegtables',

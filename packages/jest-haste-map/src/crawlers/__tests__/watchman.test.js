@@ -120,17 +120,13 @@ describe('watchman watch', () => {
 
   test('returns a list of all files when there are no clocks', () =>
     watchmanCrawl({
-      data: {
-        clocks: new Map(),
-        files: new Map(),
-      },
+      clocks: new Map(),
       extensions: ['js', 'json'],
       ignore: pearMatcher,
       rootDir: ROOT_MOCK,
       roots: ROOTS,
     }).then(response => {
-      const {hasteMap, data} = response;
-      const {removedFiles, isFresh, changedFiles} = data;
+      const {removedFiles, isFresh, changedFiles, newClocks} = response;
       const client = watchman.Client.mock.instances[0];
       const calls = client.command.mock.calls;
 
@@ -161,7 +157,7 @@ describe('watchman watch', () => {
         'vegetables/**/*.json',
       ]);
 
-      expect(hasteMap.clocks).toEqual(
+      expect(newClocks).toEqual(
         createMap({
           '': 'c:fake-clock:1',
         }),
@@ -220,10 +216,7 @@ describe('watchman watch', () => {
     };
 
     return watchmanCrawl({
-      data: {
-        clocks: new Map(),
-        files: new Map(),
-      },
+      clocks: new Map(),
       extensions: ['js', 'json', 'zip'],
       ignore: pearMatcher,
       mapper: n =>
@@ -233,8 +226,7 @@ describe('watchman watch', () => {
       rootDir: ROOT_MOCK,
       roots: ROOTS,
     }).then(response => {
-      const {data} = response;
-      const {removedFiles, isFresh, changedFiles} = data;
+      const {removedFiles, isFresh, changedFiles} = response;
       expect(isFresh).toEqual(true);
       expect(changedFiles).toEqual(
         createMap({
@@ -290,21 +282,17 @@ describe('watchman watch', () => {
     });
 
     return watchmanCrawl({
-      data: {
-        clocks,
-        files: mockFiles,
-      },
+      clocks,
       extensions: ['js', 'json'],
       ignore: pearMatcher,
       rootDir: ROOT_MOCK,
       roots: ROOTS,
     }).then(response => {
-      const {hasteMap, data} = response;
-      const {removedFiles, isFresh, changedFiles} = data;
+      const {removedFiles, isFresh, changedFiles, newClocks} = response;
       // The object was reused.
       expect(isFresh).toBe(false);
 
-      expect(hasteMap.clocks).toEqual(
+      expect(newClocks).toEqual(
         createMap({
           '': 'c:fake-clock:2',
         }),
@@ -374,19 +362,15 @@ describe('watchman watch', () => {
     });
 
     return watchmanCrawl({
-      data: {
-        clocks,
-        files: mockFiles,
-      },
+      clocks,
       extensions: ['js', 'json'],
       ignore: pearMatcher,
       rootDir: ROOT_MOCK,
       roots: ROOTS,
     }).then(response => {
-      const {hasteMap, data} = response;
-      const {removedFiles, isFresh, changedFiles} = data;
+      const {removedFiles, isFresh, changedFiles, newClocks} = response;
 
-      expect(hasteMap.clocks).toEqual(
+      expect(newClocks).toEqual(
         createMap({
           '': 'c:fake-clock:3',
         }),
@@ -471,18 +455,14 @@ describe('watchman watch', () => {
     });
 
     return watchmanCrawl({
-      data: {
-        clocks,
-        files: mockFiles,
-      },
+      clocks,
       extensions: ['js', 'json'],
       ignore: pearMatcher,
       rootDir: ROOT_MOCK,
       roots: ROOTS,
     }).then(response => {
-      const {hasteMap, data} = response;
-      const {removedFiles, isFresh, changedFiles} = data;
-      expect(hasteMap.clocks).toEqual(
+      const {removedFiles, isFresh, changedFiles, newClocks} = response;
+      expect(newClocks).toEqual(
         createMap({
           [FRUITS_RELATIVE]: 'c:fake-clock:3',
           [VEGETABLES_RELATIVE]: 'c:fake-clock:4',
@@ -542,17 +522,13 @@ describe('watchman watch', () => {
     };
 
     return watchmanCrawl({
-      data: {
-        clocks: new Map(),
-        files: new Map(),
-      },
+      clocks: new Map(),
       extensions: ['js', 'json'],
       ignore: pearMatcher,
       rootDir: ROOT_MOCK,
       roots: [...ROOTS, ROOT_MOCK],
     }).then(response => {
-      const {hasteMap, data} = response;
-      const {removedFiles, changedFiles} = data;
+      const {removedFiles, changedFiles, newClocks} = response;
       const client = watchman.Client.mock.instances[0];
       const calls = client.command.mock.calls;
 
@@ -578,15 +554,13 @@ describe('watchman watch', () => {
 
       expect(query[2].glob).toEqual(['**/*.js', '**/*.json']);
 
-      expect(hasteMap.clocks).toEqual(
+      expect(newClocks).toEqual(
         createMap({
           '': 'c:fake-clock:1',
         }),
       );
 
       expect(changedFiles).toEqual(new Map());
-
-      expect(hasteMap.files).toEqual(new Map());
 
       expect(removedFiles).toEqual(new Set());
 
@@ -617,11 +591,8 @@ describe('watchman watch', () => {
     };
 
     await watchmanCrawl({
+      clocks: new Map(),
       computeSha1: true,
-      data: {
-        clocks: new Map(),
-        files: new Map(),
-      },
       extensions: ['js', 'json'],
       rootDir: ROOT_MOCK,
       roots: [ROOT_MOCK],
@@ -657,11 +628,8 @@ describe('watchman watch', () => {
     };
 
     await watchmanCrawl({
+      clocks: new Map(),
       computeSha1: true,
-      data: {
-        clocks: new Map(),
-        files: new Map(),
-      },
       extensions: ['js', 'json'],
       rootDir: ROOT_MOCK,
       roots: [ROOT_MOCK],
