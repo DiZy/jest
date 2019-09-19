@@ -18,12 +18,20 @@ import rimraf = require('rimraf');
 export default class SQLHasteFS implements HasteFS {
   private readonly _rootDir: Config.Path;
   private readonly _cachePath: Config.Path;
+  private _cache: InternalHasteMap;
 
   constructor(rootDir: Config.Path, cachePath: Config.Path, resetCache?: boolean) {
     this._rootDir = rootDir;
     this._cachePath = cachePath;
     if(resetCache) {
       rimraf.sync(cachePath);
+    }
+    this._cache = {
+      duplicates: SQLitePersistence.getDuplicates(cachePath),
+      map: new Map(),
+      mocks: new Map(),
+      files: new Map(),
+      clocks: new Map(),
     }
   }
   
@@ -53,42 +61,61 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   getDuplicates(): DuplicatesIndex {
-    return SQLitePersistence.getDuplicates(this._cachePath);
+    return this._cache.duplicates;
   }
 
   setDuplicates(duplicates: DuplicatesIndex): void {
+    this._cache.duplicates = duplicates;
     SQLitePersistence.setDuplicates(this._cachePath, duplicates);
   }
 
   getFromModuleMap(moduleName: string): ModuleMapItem | undefined {
-    return SQLitePersistence.getFromModuleMap(this._cachePath, moduleName);
+    return this._cache.map.get(moduleName) || SQLitePersistence.getFromModuleMap(this._cachePath, moduleName);
   }
 
   setInModuleMap(moduleName: string, moduleMapItem: ModuleMapItem): void {
+    this._cache.map.set(moduleName, moduleMapItem);
     SQLitePersistence.setInModuleMap(this._cachePath, moduleName, moduleMapItem);
   }
 
   deleteFromModuleMap(moduleName: string, platform?: string | undefined): void {
+    if(platform) {
+      if (this._cache.map.get(moduleName) && Object.keys(this._cache.map.get(moduleName)!).includes(platform)) {
+        delete this._cache.map.get(moduleName)![platform];
+      }
+  
+      if(this._cache.map.get(moduleName) && Object.keys(this._cache.map.get(moduleName)!).length === 0) {
+        this._cache.map.delete(moduleName);
+      }
+    }
+    else {
+      this._cache.map.delete(moduleName);
+    }
     SQLitePersistence.deleteFromModuleMap(this._cachePath, moduleName, platform);
   }
 
   deleteFromMocks(mockName: string): void {
+    this._cache.mocks.delete(mockName);
     SQLitePersistence.deleteFromMocks(this._cachePath, mockName);
   }
 
   getMock(mockPath: string): string | undefined {
-    return SQLitePersistence.getMock(this._cachePath, mockPath);
+    // TODO: add undefined placeholder in cache
+    return this._cache.mocks.get(mockPath) || SQLitePersistence.getMock(this._cachePath, mockPath);
   }
 
   setMock(mockPath: string, relativeFilePath: string): void {
+    this._cache.mocks.set(mockPath, relativeFilePath);
     SQLitePersistence.setMock(this._cachePath, mockPath, relativeFilePath);
   }
 
   clearModuleMap(): void {
+    this._cache.map = new Map();
     SQLitePersistence.clearModuleMap(this._cachePath);
   }
 
   clearMocks(): void {
+    this._cache.mocks = new Map();
     SQLitePersistence.clearMocks(this._cachePath);
   }
 
