@@ -517,7 +517,7 @@ class SQLitePersistence implements Persistence {
 
     return db;
   }
-
+  
   getType() {
     return 'sqlite';
   }

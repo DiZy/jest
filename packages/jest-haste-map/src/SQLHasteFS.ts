@@ -13,14 +13,18 @@ import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
 import SQLitePersistence from './persistence/SQLitePersistence';
+import rimraf = require('rimraf');
 
 export default class SQLHasteFS implements HasteFS {
   private readonly _rootDir: Config.Path;
   private readonly _cachePath: Config.Path;
 
-  constructor(rootDir: Config.Path, cachePath: Config.Path) {
+  constructor(rootDir: Config.Path, cachePath: Config.Path, resetCache?: boolean) {
     this._rootDir = rootDir;
     this._cachePath = cachePath;
+    if(resetCache) {
+      rimraf.sync(cachePath);
+    }
   }
   
   getFullInternalHasteMap(): InternalHasteMap {
