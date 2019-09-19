@@ -937,8 +937,9 @@ class HasteMap extends EventEmitter {
           const relativeFilePath = fastPath.relative(rootDir, filePath);
 
           // If it exists, delete the file and all its metadata from hasteFS
-          const moduleName = hasteFS.getModuleName(relativeFilePath);
-          if(moduleName) {
+          const fileMetaData = hasteFS.getFileMetadata(relativeFilePath);
+          if(fileMetaData) {
+            const moduleName = fileMetaData[H.ID];
             const platform =
               getPlatformExtension(filePath, this._options.platforms) ||
               H.GENERIC_PLATFORM;
@@ -990,7 +991,7 @@ class HasteMap extends EventEmitter {
               fileMetadata,
               {forceInBand: true},
             );
-            hasteFS.setFileMetadata(relativeFilePath, fileMetadata);
+
             // Cleanup
             this._cleanup();
             if (promise) {
