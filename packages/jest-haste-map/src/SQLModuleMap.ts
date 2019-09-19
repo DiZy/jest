@@ -24,7 +24,7 @@ export default class SQLModuleMap extends ModuleMap {
     constructor(rootDir: Config.Path, cachePath: Config.Path) {
       const emptyMap : RawModuleMap = {
         rootDir,
-        duplicates: SQLitePersistence.getDuplicates(cachePath),
+        duplicates: SQLitePersistence.getAllDuplicates(cachePath),
         map: new Map(),
         mocks: new Map(),
       };

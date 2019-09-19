@@ -8,7 +8,7 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileData, FileMetaData, FileCrawlData, FilePersistenceData, InternalHasteMap, WatchmanClocks, DuplicatesIndex, ModuleMapItem} from './types';
+import {FileData, FileMetaData, FileCrawlData, FilePersistenceData, InternalHasteMap, WatchmanClocks, DuplicatesIndex, ModuleMapItem, DuplicatesSet} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
@@ -37,12 +37,20 @@ export default class DefaultHasteFS implements HasteFS {
     this._hasteMap.clocks = clocks;
   }
 
-  getDuplicates(): DuplicatesIndex {
+  getAllDuplicates(): DuplicatesIndex {
     return this._hasteMap.duplicates;
   }
+
+  getDuplicate(name: string): Map<string, DuplicatesSet> | undefined{
+    return this._hasteMap.duplicates.get(name);
+  }
   
-  setDuplicates(duplicates: DuplicatesIndex): void {
-    this._hasteMap.duplicates = duplicates;
+  setDuplicate(name: string, duplicate: Map<string, DuplicatesSet>): void {
+    this._hasteMap.duplicates.set(name, duplicate);
+  }
+
+  deleteDuplicate(name: string): void {
+    this._hasteMap.duplicates.delete(name);
   }
 
   getFromModuleMap(moduleName: string): ModuleMapItem | undefined {

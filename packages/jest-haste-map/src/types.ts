@@ -40,6 +40,17 @@ export type CrawlerOptions = {
   roots: Array<string>;
 };
 
+export type SQLiteCache = {
+  duplicates: DuplicatesIndex;
+  map: ModuleMapData;
+  mocks: MockData;
+  // Map<moduleName, Set<platform> | removeAllPlatforms>
+  removedModules: Map<string, Set<string> | true>,
+  removedMocks: Set<string>,
+  mocksAreCleared: boolean;
+  mapIsCleared: boolean;
+}
+
 export type HasteImpl = {
   getHasteName(filePath: Config.Path): string | undefined;
 };

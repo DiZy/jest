@@ -11,6 +11,7 @@ import {
   FilePersistenceData,
   WatchmanClocks,
   DuplicatesIndex,
+  SQLiteCache,
 } from '../types';
 import H from '../constants';
 
@@ -262,7 +263,7 @@ class SQLitePersistence implements Persistence {
       internalHasteMap.mocks.set(mock.name, mock.filePath);
     }
 
-    internalHasteMap.duplicates = this.getDuplicates(cachePath);
+    internalHasteMap.duplicates = this.getAllDuplicates(cachePath);
 
     internalHasteMap.clocks = this.getClocks(cachePath);
 
@@ -272,46 +273,105 @@ class SQLitePersistence implements Persistence {
     return internalHasteMap;
   }
 
-  setDuplicates(cachePath: string, duplicates: DuplicatesIndex): void {
-    const db = this.getDatabase(cachePath, true);
-    db.exec('DELETE FROM duplicates');
-    const insertDuplicateStmt = db.prepare(
-      `INSERT INTO duplicates (name, serialized) VALUES (?, ?)`,
-    );
-    for (const [name, duplicate] of duplicates) {
-      insertDuplicateStmt.run(name, v8.serialize(duplicate));
-    }
-    db.close();
-  }
+  writeModuleMapData(cachePath: string, moduleMapData: SQLiteCache) {
+    const db = this.getDatabase(cachePath, false);
+    
+    db.transaction(() => {
+      if(moduleMapData.mocksAreCleared) {
+        // Remove all mocks
+        db.exec('DELETE FROM mocks');
+      } else {
+        // Remove all removedMocks
+        for (const name of moduleMapData.removedMocks) {
+          db.prepare('DELETE FROM mocks where name = ?').run(name);
+        }
+      }
+  
+      if(moduleMapData.mapIsCleared) {
+        // Remove all map
+        db.exec('DELETE FROM map');
+      } else {
+        // Remove all removedModules
+        for (const [name, platforms] of moduleMapData.removedModules) {
+          if(platforms instanceof Set) {
+            const moduleItem = this.getFromModuleMap(cachePath, name);
+            if(!moduleItem) {
+              continue;
+            }
 
-  setInModuleMap(cachePath: string, moduleName: string, moduleMapItem: ModuleMapItem): void {
-    const db = this.getDatabase(cachePath, true);
-    const runMapStmt = (
-      stmt: betterSqlLite3.Statement,
-      [name, mapItem]: [string, ModuleMapItem],
-    ) => {
-      const params = [name,
-        ...mapItem[H.GENERIC_PLATFORM] || [null, null],
-        ...mapItem[H.NATIVE_PLATFORM] || [null, null],
-        ...mapItem[H.IOS_PLATFORM] || [null, null],
-        ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
-      stmt.run(
-        params
+            for (const platform of platforms) {
+              delete moduleItem[platform];
+            }
+
+            if(Object.keys(moduleItem).length === 0) {
+              // Delete if empty
+              db.prepare('DELETE FROM map WHERE name = ?').run(name);
+            } else if (moduleItem) {
+              const runMapStmt = (
+                stmt: betterSqlLite3.Statement,
+                [name, mapItem]: [string, ModuleMapItem],
+              ) => {
+                const params = [name,
+                  ...mapItem[H.GENERIC_PLATFORM] || [null, null],
+                  ...mapItem[H.NATIVE_PLATFORM] || [null, null],
+                  ...mapItem[H.IOS_PLATFORM] || [null, null],
+                  ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
+                stmt.run(
+                  params
+                );
+              };
+              const upsertMapStmt = db.prepare(
+                `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              );
+              runMapStmt(upsertMapStmt, [name, moduleItem]);
+            }
+          }
+          else {
+            db.prepare('DELETE FROM map where name = ?').run(name);
+          }
+        }
+      }
+  
+      // Insert or replace changed mocks
+      for (const [name, filePath] of moduleMapData.mocks) {
+        const insertMock = db.prepare(
+          `INSERT OR REPLACE INTO mocks (name, filePath) VALUES (?, ?)`,
+        );
+        insertMock.run(name, filePath);
+      }
+  
+      // Insert or replace changed modules
+      const runMapStmt = (
+        stmt: betterSqlLite3.Statement,
+        [name, mapItem]: [string, ModuleMapItem],
+      ) => {
+        const params = [name,
+          ...mapItem[H.GENERIC_PLATFORM] || [null, null],
+          ...mapItem[H.NATIVE_PLATFORM] || [null, null],
+          ...mapItem[H.IOS_PLATFORM] || [null, null],
+          ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
+        stmt.run(
+          params
+        );
+      };
+      const upsertMapStmt = db.prepare(
+        `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
-    };
-    const upsertMapStmt = db.prepare(
-      `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    runMapStmt(upsertMapStmt, [moduleName, moduleMapItem]);
-    db.close();
-  }
+      for (const [name, moduleItem] of moduleMapData.map) {
+        runMapStmt(upsertMapStmt, [name, moduleItem]);
+      }
+  
+      // Replace all duplicates
+      db.exec('DELETE FROM duplicates');
+      const insertDuplicateStmt = db.prepare(
+        `INSERT INTO duplicates (name, serialized) VALUES (?, ?)`,
+      );
+      for (const [name, duplicate] of moduleMapData.duplicates) {
+        insertDuplicateStmt.run(name, v8.serialize(duplicate));
+      }
+      
+    })();
 
-  setMock(cachePath: string, name: string, filePath: string) {
-    const db = this.getDatabase(cachePath, true);
-    const insertMock = db.prepare(
-      `INSERT OR REPLACE INTO mocks (name, filePath) VALUES (?, ?)`,
-    );
-    insertMock.run(name, filePath);
     db.close();
   }
 
@@ -325,62 +385,6 @@ class SQLitePersistence implements Persistence {
     for (const [relativeRoot, since] of clocks) {
       insertClock.run(relativeRoot, since);
     }
-    db.close();
-  }
-
-  clearMocks(cachePath: string) {
-    const db = this.getDatabase(cachePath, true);
-    db.exec('DELETE FROM mocks');
-    db.close();
-  }
-
-  clearModuleMap(cachePath: string) {
-    const db = this.getDatabase(cachePath, true);
-    db.exec('DELETE FROM map');
-    db.close();
-  }
-
-  deleteFromModuleMap(cachePath: string, name: string, platform?: string) {
-    const db = this.getDatabase(cachePath, true);
-    if(platform) {
-      const moduleItem = this.getFromModuleMap(cachePath, name);
-      if (moduleItem && Object.keys(moduleItem).includes(platform)) {
-        delete moduleItem[platform];
-      }
-
-      if(moduleItem && Object.keys(moduleItem).length === 0) {
-        // delete if empty
-        db.prepare('DELETE FROM map where name = ?').run(name);
-      } else if (moduleItem) {
-        // update otherwise
-        const runMapStmt = (
-          stmt: betterSqlLite3.Statement,
-          [name, mapItem]: [string, ModuleMapItem],
-        ) => {
-          const params = [name,
-            ...mapItem[H.GENERIC_PLATFORM] || [null, null],
-            ...mapItem[H.NATIVE_PLATFORM] || [null, null],
-            ...mapItem[H.IOS_PLATFORM] || [null, null],
-            ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
-          stmt.run(
-            params
-          );
-        };
-        const upsertMapStmt = db.prepare(
-          `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        );
-        runMapStmt(upsertMapStmt, [name, moduleItem]);
-      }
-    }
-    else {
-      db.prepare('DELETE FROM map where name = ?').run(name);
-    }
-    db.close();
-  }
-
-  deleteFromMocks(cachePath: string, name: string) {
-    const db = this.getDatabase(cachePath, true);
-    db.prepare('DELETE FROM mocks where name = ?').run(name);
     db.close();
   }
 
@@ -450,7 +454,7 @@ class SQLitePersistence implements Persistence {
     return mapItem;
   }
 
-  getDuplicates(cachePath: string) {
+  getAllDuplicates(cachePath: string) {
     const db = this.getDatabase(cachePath, false);
     const duplicates : DuplicatesIndex = new Map();
 
@@ -517,7 +521,7 @@ class SQLitePersistence implements Persistence {
 
     return db;
   }
-  
+
   getType() {
     return 'sqlite';
   }

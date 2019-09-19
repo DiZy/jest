@@ -24,14 +24,6 @@ exports[`HasteMap tries to crawl using node as a fallback 1`] = `
   Error: watchman error"
 `;
 
-exports[`HasteMap warns on duplicate mock files 1`] = `
-"jest-haste-map: duplicate manual mock found: subdir/Blueberry
-  The following files share their name; please delete one of them:
-    * <rootDir>/fruits1/__mocks__/subdir/Blueberry.js
-    * <rootDir>/fruits2/__mocks__/subdir/Blueberry.js
-"
-`;
-
 exports[`HasteMap warns on duplicate module ids 1`] = `
 "jest-haste-map: Haste module naming collision: Strawberry
   The following files share their name; please adjust your hasteImpl:

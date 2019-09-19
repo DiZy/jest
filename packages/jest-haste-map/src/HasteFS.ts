@@ -6,7 +6,7 @@
  */
 
 import {Config} from '@jest/types';
-import { FileMetaData, FileCrawlData, FilePersistenceData, FileData, WatchmanClocks, DuplicatesIndex, ModuleMapItem, InternalHasteMap } from './types';
+import { FileMetaData, FileCrawlData, FilePersistenceData, FileData, WatchmanClocks, DuplicatesIndex, ModuleMapItem, InternalHasteMap, DuplicatesSet } from './types';
 
 export default interface HasteFS {
 
@@ -55,9 +55,13 @@ export default interface HasteFS {
 
   setClocks(clocks: WatchmanClocks): void;
 
-  getDuplicates: () => DuplicatesIndex;
+  getAllDuplicates: () => DuplicatesIndex;
 
-  setDuplicates(duplicates: DuplicatesIndex): void;
+  getDuplicate(name: string): Map<string, DuplicatesSet> | undefined;
+
+  setDuplicate(name: string, dups: Map<string, DuplicatesSet>): void;
+
+  deleteDuplicate(name: string): void;
 
   getFromModuleMap(moduleName: string): ModuleMapItem | undefined;
 

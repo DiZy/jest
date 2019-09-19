@@ -417,6 +417,8 @@ class HasteMap extends EventEmitter {
   private createHasteModuleMap(hasteFS: HasteFS): HasteModuleMap{
     if(getPersistence(this._options.useSQLite).getType() === 'sqlite') {
       const SQLModuleMap = require('./SQLModuleMap').default;
+      // Make sure it is persisted from cache before returning
+      hasteFS.persist();
       return new SQLModuleMap(this._options.rootDir, this._cachePath);
     }else {
       const fullInternalHasteMap = hasteFS.getFullInternalHasteMap();
@@ -437,8 +439,6 @@ class HasteMap extends EventEmitter {
     workerOptions?: {forceInBand: boolean},
   ): Promise<{updatedData?: FileMetaData, removeFile: boolean,}> | null {
     const rootDir = this._options.rootDir;
-    
-    const allDuplicates = hasteFS.getDuplicates();
 
     const setModule = (id: string, moduleItem: ModuleMetaData) => {
       let moduleMap = hasteFS.getFromModuleMap(id);
@@ -478,10 +478,10 @@ class HasteMap extends EventEmitter {
           hasteFS.deleteFromModuleMap(id);
         }
 
-        let dupsByPlatform = allDuplicates.get(id);
+        let dupsByPlatform = hasteFS.getDuplicate(id);
         if (dupsByPlatform == null) {
           dupsByPlatform = new Map();
-          allDuplicates.set(id, dupsByPlatform);
+          hasteFS.setDuplicate(id, dupsByPlatform);
         }
 
         const dups = new Map([
@@ -489,18 +489,18 @@ class HasteMap extends EventEmitter {
           [existingModule[H.PATH], existingModule[H.TYPE]],
         ]);
         dupsByPlatform.set(platform, dups);
-        hasteFS.setDuplicates(allDuplicates);
+        hasteFS.setDuplicate(id, dupsByPlatform);
 
         return;
       }
 
-      const dupsByPlatform = allDuplicates.get(id);
+      const dupsByPlatform = hasteFS.getDuplicate(id);
       if (dupsByPlatform != null) {
         const dups = dupsByPlatform.get(platform);
         if (dups != null) {
           dups.set(moduleItem[H.PATH], moduleItem[H.TYPE]);
         }
-        hasteFS.setDuplicates(allDuplicates);
+        hasteFS.setDuplicate(id, dupsByPlatform);
         return;
       }
 
@@ -965,7 +965,6 @@ class HasteMap extends EventEmitter {
               const mockName = getMockName(filePath);
               hasteFS.deleteFromMocks(mockName);
             }
-
             this._recoverDuplicates(hasteFS, relativeFilePath, moduleName);
           }
 
@@ -1049,8 +1048,7 @@ class HasteMap extends EventEmitter {
     relativeFilePath: string,
     moduleName: string,
   ) {
-    let allDuplicates = hasteFS.getDuplicates();
-    let dupsByPlatform = allDuplicates.get(moduleName);
+    let dupsByPlatform = hasteFS.getDuplicate(moduleName);
     if (dupsByPlatform == null) {
       return;
     }
@@ -1064,12 +1062,11 @@ class HasteMap extends EventEmitter {
     }
 
     dupsByPlatform = copyMap(dupsByPlatform);
-    allDuplicates.set(moduleName, dupsByPlatform);
 
     dups = copyMap(dups);
     dupsByPlatform.set(platform, dups);
     dups.delete(relativeFilePath);
-    hasteFS.setDuplicates(allDuplicates);
+    hasteFS.setDuplicate(moduleName, dupsByPlatform);
 
     if (dups.size !== 1) {
       return;
@@ -1089,9 +1086,9 @@ class HasteMap extends EventEmitter {
     dedupMap[platform] = uniqueModule;
     hasteFS.setInModuleMap(moduleName, dedupMap);
     dupsByPlatform.delete(platform);
+    hasteFS.setDuplicate(moduleName, dupsByPlatform);
     if (dupsByPlatform.size === 0) {
-      allDuplicates.delete(moduleName);
-      hasteFS.setDuplicates(allDuplicates);
+      hasteFS.deleteDuplicate(moduleName);
     }
   }
 
