@@ -119,15 +119,16 @@ export default class SQLHasteFS implements HasteFS {
         this._localCache.removedModules.set(moduleName, new Set([platform]));
       }
 
-      if (this._localCache.map.get(moduleName) && Object.keys(this._localCache.map.get(moduleName)!).includes(platform)) {
+      if (this._localCache.map.get(moduleName)) {
         delete this._localCache.map.get(moduleName)![platform];
-      }
 
-      if(this._localCache.map.get(moduleName) && Object.keys(this._localCache.map.get(moduleName)!).length === 0) {
-        this._localCache.map.delete(moduleName);
+        if(Object.keys(this._localCache.map.get(moduleName)!).length === 0) {
+          this._localCache.map.delete(moduleName);
+        }
       }
     }
     else {
+      // Remove all if platform is not specified
       this._localCache.removedModules.set(moduleName, true);
       this._localCache.map.delete(moduleName);
     }
@@ -151,6 +152,7 @@ export default class SQLHasteFS implements HasteFS {
     }
 
     mock = mock || SQLitePersistence.getMock(this._cachePath, mockPath);
+    return mock;
   }
 
   setMock(mockPath: string, relativeFilePath: string): void {

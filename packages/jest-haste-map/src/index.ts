@@ -46,7 +46,7 @@ import {
   ModuleMapItem,
   WatchmanClocks,
 } from './types';
-import getPersistence from './persistence/persistence';
+import getPersistence from './persistence/getPersistence';
 import HasteFS from './HasteFS';
 
 type HType = typeof H;
@@ -384,7 +384,7 @@ class HasteMap extends EventEmitter {
           fileCrawlData.removedFiles.size > 0
         ) {
           await this._buildHasteMap(hasteFS, fileCrawlData);
-          hasteFS.persist(); // If not using sqlite, need to force persist at end
+          hasteFS.persist();
         }
 
         const moduleMap = this.createHasteModuleMap(hasteFS);
@@ -417,7 +417,7 @@ class HasteMap extends EventEmitter {
   private createHasteModuleMap(hasteFS: HasteFS): HasteModuleMap{
     if(getPersistence(this._options.useSQLite).getType() === 'sqlite') {
       const SQLModuleMap = require('./SQLModuleMap').default;
-      // Make sure it is persisted from cache before returning
+      // Make sure it is persisted from hasteFS cache before returning
       hasteFS.persist();
       return new SQLModuleMap(this._options.rootDir, this._cachePath);
     }else {
@@ -800,22 +800,13 @@ class HasteMap extends EventEmitter {
             `  ` +
             error,
         );
-        try {
-          return nodeCrawl(crawlerOptions).catch(e => {
-            throw new Error(
-              `Crawler retry failed:\n` +
-                `  Original error: ${error.message}\n` +
-                `  Retry error: ${e.message}\n`,
-            );
-          });
-        }
-        catch (e){
+        return nodeCrawl(crawlerOptions).catch (e => {
           throw new Error(
             `Crawler retry failed:\n` +
               `  Original error: ${error.message}\n` +
               `  Retry error: ${e.message}\n`,
           );
-        }
+        });
       }
 
       throw error;

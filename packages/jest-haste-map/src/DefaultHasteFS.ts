@@ -63,12 +63,12 @@ export default class DefaultHasteFS implements HasteFS {
 
   deleteFromModuleMap(moduleName: string, platform?: string): void {
     if(platform) {
-      if (this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).includes(platform)) {
+      if (this._hasteMap.map.get(moduleName)) {
         delete this._hasteMap.map.get(moduleName)![platform];
-      }
-  
-      if(this._hasteMap.map.get(moduleName) && Object.keys(this._hasteMap.map.get(moduleName)!).length === 0) {
-        this._hasteMap.map.delete(moduleName);
+        
+        if(Object.keys(this._hasteMap.map.get(moduleName)!).length === 0) {
+          this._hasteMap.map.delete(moduleName);
+        }
       }
     }
     else {

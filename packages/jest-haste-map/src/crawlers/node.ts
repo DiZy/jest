@@ -13,7 +13,7 @@ import {
   CrawlerOptions,
   IgnoreMatcher,
   FileCrawlData,
-  ChangedFileMetadata,
+  CrawledFileMetadata,
 } from '../types';
 
 type Result = Array<[/* id */ string, /* mtime */ number, /* size */ number]>;
@@ -145,7 +145,7 @@ export = function nodeCrawl(
 
   return new Promise(resolve => {
     const callback = (list: Result) => {
-      const changedFiles = new Map<string, ChangedFileMetadata>();
+      const changedFiles = new Map<string, CrawledFileMetadata>();
       list.forEach(fileData => {
         const [filePath, mtime, size] = fileData;
         const relativeFilePath = fastPath.relative(rootDir, filePath);

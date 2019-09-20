@@ -130,7 +130,7 @@ export type ChangeEvent = {
   moduleMap: ModuleMap;
 };
 
-export type ChangedFileMetadata = {
+export type CrawledFileMetadata = {
   mtime: number,
   size: number,
   sha1: string | null | undefined,
@@ -138,7 +138,7 @@ export type ChangedFileMetadata = {
 
 export type FileCrawlData = {
   removedFiles: Set<Config.Path>,
-  changedFiles: Map<Config.Path, ChangedFileMetadata>, // Contains only new information
+  changedFiles: Map<Config.Path, CrawledFileMetadata>, // Contains only new information
   isFresh: boolean,
   newClocks?: WatchmanClocks,
 };
