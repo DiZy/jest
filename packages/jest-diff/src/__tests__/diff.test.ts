@@ -5,10 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import ansiRegex = require('ansi-regex');
-import * as style from 'ansi-styles';
 import chalk from 'chalk';
 import stripAnsi from 'strip-ansi';
+import {alignedAnsiStyleSerializer} from '@jest/test-utils';
 
 import diff from '../';
 import {diffStringsUnified} from '../printDiffs';
@@ -46,45 +45,7 @@ const expanded = {expand: true};
 
 const elementSymbol = Symbol.for('react.element');
 
-expect.addSnapshotSerializer({
-  serialize(val: string): string {
-    return val.replace(ansiRegex(), match => {
-      switch (match) {
-        case style.inverse.open:
-          return '<i>';
-        case style.inverse.close:
-          return '</i>';
-
-        case style.bold.open:
-          return '<b>';
-        case style.dim.open:
-          return '<d>';
-        case style.green.open:
-          return '<g>';
-        case style.red.open:
-          return '<r>';
-        case style.yellow.open:
-          return '<y>';
-        case style.bgYellow.open:
-          return '<Y>';
-
-        case style.bold.close:
-        case style.dim.close:
-        case style.green.close:
-        case style.red.close:
-        case style.yellow.close:
-        case style.bgYellow.close:
-          return '</>';
-
-        default:
-          return match;
-      }
-    });
-  },
-  test(val: any): val is string {
-    return typeof val === 'string';
-  },
-});
+expect.addSnapshotSerializer(alignedAnsiStyleSerializer);
 
 describe('different types', () => {
   [
@@ -699,7 +660,7 @@ describe('trailing newline in multiline string not enclosed in quotes', () => {
   const b = a + '\n';
 
   describe('from less to more', () => {
-    const expected = ['  line 1', '  line 2', '  line 3', '+ '].join('\n');
+    const expected = ['  line 1', '  line 2', '  line 3', '+'].join('\n');
 
     test('(unexpanded)', () => {
       expect(diff(a, b, unexpandedBe)).toBe(expected);
@@ -710,7 +671,7 @@ describe('trailing newline in multiline string not enclosed in quotes', () => {
   });
 
   describe('from more to less', () => {
-    const expected = ['  line 1', '  line 2', '  line 3', '- '].join('\n');
+    const expected = ['  line 1', '  line 2', '  line 3', '-'].join('\n');
 
     test('(unexpanded)', () => {
       expect(diff(b, a, unexpandedBe)).toBe(expected);
@@ -954,6 +915,37 @@ describe('options', () => {
       };
 
       expect(diff(aTrailingSpaces, bTrailingSpaces, options)).toMatchSnapshot();
+    });
+  });
+
+  describe('firstOrLastEmptyLineReplacement', () => {
+    const noColor = (string: string) => string;
+    const options = {
+      aColor: noColor,
+      bColor: noColor,
+      changeColor: noColor,
+      commonColor: noColor,
+      firstOrLastEmptyLineReplacement: '',
+      omitAnnotationLines: true,
+    };
+
+    const aEmpty = '\ncommon\nchanged from\n';
+    const bEmpty = '\ncommon\nchanged to\n';
+
+    const expected = [
+      '',
+      '  common',
+      '- changed from',
+      '+ changed to',
+      '',
+    ].join('\n');
+
+    test('diffDefault', () => {
+      expect(diff(aEmpty, bEmpty, options)).toBe(expected);
+    });
+
+    test('diffStringsUnified', () => {
+      expect(diffStringsUnified(aEmpty, bEmpty, options)).toBe(expected);
     });
   });
 });
