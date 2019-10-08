@@ -414,6 +414,32 @@ class HasteMap extends EventEmitter {
     return hasteMap;
   }
 
+  readModuleMap(): HasteModuleMap {
+    let hasteFS: HasteFS;
+    // Avoid full file read if sqlite is available
+    if (getPersistence(this._options.useSQLite).getType() === 'sqlite') {
+      const SQLHasteFS = require('./SQLHasteFS').default;
+      hasteFS = new SQLHasteFS(this._options.rootDir, this._cachePath, this._options.resetCache);
+    } else {
+      let existingHasteMap: InternalHasteMap;
+      try {
+        if(this._options.resetCache) {
+          existingHasteMap = this._createEmptyMap();
+        } else {
+          existingHasteMap = this.read();
+        }
+      } catch {
+        existingHasteMap = this._createEmptyMap();
+      }
+      hasteFS = new DefaultHasteFS({
+        initialHasteMap: existingHasteMap,
+        rootDir: this._options.rootDir,
+        cachePath: this._cachePath,
+      });
+    }
+    return this.createHasteModuleMap(hasteFS);
+  }
+
   private createHasteModuleMap(hasteFS: HasteFS): HasteModuleMap{
     if(getPersistence(this._options.useSQLite).getType() === 'sqlite') {
       const SQLModuleMap = require('./SQLModuleMap').default;
