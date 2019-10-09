@@ -320,6 +320,7 @@ class HasteMap extends EventEmitter {
       (options.ignorePattern || '').toString(),
       hasteImplHash,
       dependencyExtractorHash,
+      this._options.useSQLite ? 'sqlite' : 'v8',
     );
     this._whitelist = getWhiteList(options.providesModuleNodeModules);
     this._buildPromise = null;
