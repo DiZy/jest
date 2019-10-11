@@ -58,6 +58,7 @@ const DEFAULT_GLOBAL_CONFIG: Config.GlobalConfig = {
   testSequencer: '@jest/test-sequencer',
   testTimeout: 5000,
   updateSnapshot: 'none',
+  useSQLite: false,
   useStderr: false,
   verbose: false,
   watch: false,
