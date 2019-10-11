@@ -919,6 +919,10 @@ export default function normalize(
     10,
   );
 
+  if (!newOptions.useSQLite) {
+    newOptions.useSQLite = false;
+  }
+
   if (
     newOptions.lastCommit ||
     newOptions.changedFilesWithAncestor ||

@@ -219,7 +219,7 @@ export type InitialOptions = {
   watchPathIgnorePatterns?: Array<string>;
   unmockedModulePathPatterns?: Array<string>;
   updateSnapshot?: boolean;
-  useSQLite?: boolean | null | undefined;
+  useSQLite?: boolean;
   useStderr?: boolean;
   verbose?: boolean | null | undefined;
   watch?: boolean;
@@ -502,6 +502,7 @@ export type Argv = Arguments<
     transformIgnorePatterns: Array<string>;
     unmockedModulePathPatterns: Array<string> | null | undefined;
     updateSnapshot: boolean;
+    useSQLite: boolean;
     useStderr: boolean;
     verbose: boolean | null | undefined;
     version: boolean;
