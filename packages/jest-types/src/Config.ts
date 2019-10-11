@@ -502,7 +502,7 @@ export type Argv = Arguments<
     transformIgnorePatterns: Array<string>;
     unmockedModulePathPatterns: Array<string> | null | undefined;
     updateSnapshot: boolean;
-    useSQLite: boolean;
+    useSQLite?: boolean;
     useStderr: boolean;
     verbose: boolean | null | undefined;
     version: boolean;
