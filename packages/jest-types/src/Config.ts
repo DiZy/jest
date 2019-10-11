@@ -219,7 +219,7 @@ export type InitialOptions = {
   watchPathIgnorePatterns?: Array<string>;
   unmockedModulePathPatterns?: Array<string>;
   updateSnapshot?: boolean;
-  useSQLite: boolean;
+  useSQLite?: boolean | null | undefined;
   useStderr?: boolean;
   verbose?: boolean | null | undefined;
   watch?: boolean;

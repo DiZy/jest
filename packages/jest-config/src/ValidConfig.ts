@@ -123,7 +123,6 @@ const initialOptions: Config.InitialOptions = {
   transformIgnorePatterns: [NODE_MODULES_REGEXP],
   unmockedModulePathPatterns: ['mock'],
   updateSnapshot: true,
-  useSQLite: false,
   useStderr: false,
   verbose: false,
   watch: false,
