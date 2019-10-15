@@ -14,6 +14,7 @@ import {
   SQLiteCache,
 } from '../types';
 import H from '../constants';
+import rimraf = require('rimraf');
 
 class SQLitePersistence implements Persistence {
   findFilePathsBasedOnPattern(cachePath: string, pattern: string): Array<string> {
@@ -472,26 +473,32 @@ class SQLitePersistence implements Persistence {
     return duplicates;
   }
 
-  private getDatabase(cachePath: string, mustExist: boolean) {
-    const dbExists = fs.existsSync(cachePath);
-    if (dbExists === false && mustExist) {
-      throw new Error(`Haste SQLite DB does not exist at ${cachePath}`);
+  private getDatabase(cachePath: string, _mustExist: boolean) {
+    let db = betterSqlLite3(cachePath);
+
+    try {
+      db.exec(`CREATE TABLE IF NOT EXISTS files(
+        filePath text PRIMARY KEY,
+        id text NOT NULL,
+        mtime integer NOT NULL,
+        size integer NOT NULL,
+        visited integer NOT NULL,
+        dependencies text NOT NULL,
+        sha1 text
+      );`);
+    } catch {
+      rimraf.sync(cachePath);
+      db = betterSqlLite3(cachePath);
+      db.exec(`CREATE TABLE IF NOT EXISTS files(
+        filePath text PRIMARY KEY,
+        id text NOT NULL,
+        mtime integer NOT NULL,
+        size integer NOT NULL,
+        visited integer NOT NULL,
+        dependencies text NOT NULL,
+        sha1 text
+      );`);
     }
-
-    const db = betterSqlLite3(cachePath, {
-      fileMustExist: dbExists,
-    });
-
-    db.exec(`CREATE TABLE IF NOT EXISTS files(
-      filePath text PRIMARY KEY,
-      id text NOT NULL,
-      mtime integer NOT NULL,
-      size integer NOT NULL,
-      visited integer NOT NULL,
-      dependencies text NOT NULL,
-      sha1 text
-    );`);
-
     db.exec(`CREATE TABLE IF NOT EXISTS map(
       name text NOT NULL PRIMARY KEY,
       genericPath text,
