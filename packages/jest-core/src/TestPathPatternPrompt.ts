@@ -25,10 +25,12 @@ type SearchSources = Array<{
 // TODO: Make underscored props `private`
 export default class TestPathPatternPrompt extends PatternPrompt {
   _searchSources?: SearchSources;
+  _useSQLite: boolean;
 
-  constructor(pipe: NodeJS.WritableStream, prompt: Prompt) {
+  constructor(pipe: NodeJS.WritableStream, prompt: Prompt, useSQLite: boolean) {
     super(pipe, prompt);
     this._entityName = 'filenames';
+    this._useSQLite = useSQLite;
   }
 
   _onChange(pattern: string, options: ScrollOptions) {
@@ -52,7 +54,7 @@ export default class TestPathPatternPrompt extends PatternPrompt {
     let tests: Array<Test> = [];
     if (regex && this._searchSources) {
       this._searchSources.forEach(({searchSource}) => {
-        tests = tests.concat(searchSource.findMatchingTests(pattern).tests);
+        tests = tests.concat(searchSource.findMatchingTests(this._useSQLite, pattern).tests);
       });
     }
 

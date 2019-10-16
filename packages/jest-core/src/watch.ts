@@ -217,7 +217,7 @@ export default function watch(
     if (hooks.isUsed('onFileChange')) {
       const projects = searchSources.map(({context, searchSource}) => ({
         config: context.config,
-        testPaths: searchSource.findMatchingTests('').tests.map(t => t.path),
+        testPaths: searchSource.findMatchingTests(globalConfig.useSQLite, '').tests.map(t => t.path),
       }));
       hooks.getEmitter().onFileChange({projects});
     }

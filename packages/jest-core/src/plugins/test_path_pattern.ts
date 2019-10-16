@@ -39,6 +39,7 @@ class TestPathPatternPlugin extends BaseWatchPlugin {
       const testPathPatternPrompt = new TestPathPatternPrompt(
         this._stdout,
         this._prompt,
+        globalConfig.useSQLite,
       );
 
       testPathPatternPrompt.run(

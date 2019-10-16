@@ -1,5 +1,4 @@
 import * as v8 from 'v8';
-import * as fs from 'fs';
 import betterSqlLite3 from 'better-sqlite3';
 import {
   InternalHasteMap,
