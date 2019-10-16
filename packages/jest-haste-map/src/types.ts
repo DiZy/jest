@@ -41,6 +41,7 @@ export type CrawlerOptions = {
 };
 
 export type SQLiteCache = {
+  clocks: WatchmanClocks;
   duplicates: DuplicatesIndex;
   map: ModuleMapData;
   mocks: MockData;

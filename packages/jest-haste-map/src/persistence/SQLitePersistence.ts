@@ -369,22 +369,17 @@ class SQLitePersistence implements Persistence {
       for (const [name, duplicate] of moduleMapData.duplicates) {
         insertDuplicateStmt.run(name, v8.serialize(duplicate));
       }
-      
+
+      // Replace clocks.
+      db.exec('DELETE FROM clocks');
+      const insertClock = db.prepare(
+        `INSERT INTO clocks (relativeRoot, since) VALUES (?, ?)`,
+      );
+      for (const [relativeRoot, since] of moduleMapData.clocks) {
+        insertClock.run(relativeRoot, since);
+      }
     })();
 
-    db.close();
-  }
-
-  setClocks(cachePath: string, clocks: WatchmanClocks): void {
-    const db = this.getDatabase(cachePath, true);
-    // Replace clocks.
-    db.exec('DELETE FROM clocks');
-    const insertClock = db.prepare(
-      `INSERT INTO clocks (relativeRoot, since) VALUES (?, ?)`,
-    );
-    for (const [relativeRoot, since] of clocks) {
-      insertClock.run(relativeRoot, since);
-    }
     db.close();
   }
 

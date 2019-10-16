@@ -27,6 +27,7 @@ export default class SQLHasteFS implements HasteFS {
       rimraf.sync(cachePath);
     }
     this._localCache = {
+      clocks: SQLitePersistence.getClocks(cachePath),
       duplicates: SQLitePersistence.getAllDuplicates(cachePath),
       map: new Map(),
       mocks: new Map(),
@@ -55,11 +56,11 @@ export default class SQLHasteFS implements HasteFS {
   }
   
   getClocks(): WatchmanClocks {
-    return SQLitePersistence.getClocks(this._cachePath);
+    return this._localCache.clocks;
   }
 
   setClocks(clocks: WatchmanClocks): void {
-    SQLitePersistence.setClocks(this._cachePath, clocks);
+    this._localCache.clocks = clocks;
   }
 
   getAllDuplicates(): DuplicatesIndex {
