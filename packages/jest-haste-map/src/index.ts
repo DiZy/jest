@@ -700,7 +700,11 @@ class HasteMap extends EventEmitter {
     }
 
     for (const relativeFilePath of removedFiles) {
-      const fileMetadata = hasteFS.getFileMetadata(relativeFilePath);
+      const absPath = fastPath.resolve(
+        this._options.rootDir,
+        relativeFilePath,
+      );
+      const fileMetadata = hasteFS.getFileMetadata(absPath);
       if(fileMetadata) {
         if(fileMetadata[H.ID]) {
           const platform =
@@ -955,13 +959,13 @@ class HasteMap extends EventEmitter {
           const relativeFilePath = fastPath.relative(rootDir, filePath);
 
           // If it exists, delete the file and all its metadata from hasteFS
-          const fileMetaData = hasteFS.getFileMetadata(relativeFilePath);
+          const fileMetaData = hasteFS.getFileMetadata(filePath);
           if(fileMetaData) {
             const moduleName = fileMetaData[H.ID];
             const platform =
               getPlatformExtension(filePath, this._options.platforms) ||
               H.GENERIC_PLATFORM;
-            hasteFS.deleteFileMetadata(relativeFilePath);
+            hasteFS.deleteFileMetadata(filePath);
 
             let moduleMap = hasteFS.getFromModuleMap(moduleName);
             if (moduleMap != null) {
@@ -1015,14 +1019,14 @@ class HasteMap extends EventEmitter {
               return new Promise<void>((resolve) => {
                 promise.then((value) => {
                   if(value.removeFile) {
-                    hasteFS.deleteFileMetadata(relativeFilePath);
+                    hasteFS.deleteFileMetadata(filePath);
                   }
                   else {
                     if(value.updatedData) {
-                      hasteFS.setFileMetadata(relativeFilePath, value.updatedData);
+                      hasteFS.setFileMetadata(filePath, value.updatedData);
                     }
                     else {
-                      hasteFS.setFileMetadata(relativeFilePath, fileMetadata);
+                      hasteFS.setFileMetadata(filePath, fileMetadata);
                     }
                   }
                   resolve();

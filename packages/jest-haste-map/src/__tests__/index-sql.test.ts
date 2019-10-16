@@ -11,7 +11,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import {skipSuiteOnWindows} from '@jest/test-utils';
 import { tmpdir } from 'os';
-import betterSqlLite3 from 'better-sqlite3';
 import rimraf = require('rimraf');
 
 const testDirectory = path.resolve(tmpdir(), 'jest-index-sql-test');
@@ -212,18 +211,9 @@ describe('HasteMap', () => {
     };
     mockMTime = 32;
 
-    //Initialize empty db
+    //Clear db
     rimraf.sync(testDirectory);
     fs.mkdirSync(testDirectory);
-    
-    const db = betterSqlLite3(cacheFilePath, {
-    });
-
-    db.exec('DROP TABLE IF EXISTS files');
-    db.exec('DROP TABLE IF EXISTS map');
-    db.exec('DROP TABLE IF EXISTS mocks');
-    db.exec('DROP TABLE IF EXISTS duplicates');
-    db.exec('DROP TABLE IF EXISTS clocks');
   });
 
   afterEach(() => {
@@ -302,14 +292,14 @@ describe('HasteMap', () => {
 
   it('can match using sql instead of reading all files', () =>
     new HasteMap(defaultConfig).build().then(({hasteFS}) => {
-      expect(hasteFS.matchFilesBasedOnRelativePath('%fruits/%')).toEqual([
+      expect(hasteFS.matchFilesBasedOnRelativePath('fruits/')).toEqual([
         '/project/fruits/Banana.js',
         '/project/fruits/Pear.js',
         '/project/fruits/Strawberry.js',
         '/project/fruits/__mocks__/Pear.js',
       ]);
 
-      expect(hasteFS.matchFilesBasedOnRelativePath('%/__mocks__/%')).toEqual([
+      expect(hasteFS.matchFilesBasedOnRelativePath('/__mocks__/')).toEqual([
         '/project/fruits/__mocks__/Pear.js',
       ]);
   }));
@@ -1299,7 +1289,7 @@ describe('HasteMap', () => {
           type: 'change',
         },
       ]);
-      expect(hasteFS.getModuleName('fruits/Tomato.js')).not.toBeNull();
+      expect(hasteFS.getModuleName('/project/fruits/Tomato.js')).not.toBeNull();
       expect(moduleMap.getModule('Tomato')).toBeDefined();
       expect(moduleMap.getModule('Pear')).toBe('/project/fruits/Pear.js');
     });
@@ -1368,8 +1358,8 @@ describe('HasteMap', () => {
             type: 'change',
           },
         ]);
-        expect(hasteFS.getModuleName('fruits/Orange.ios.js')).toBeTruthy();
-        expect(hasteFS.getModuleName('fruits/Orange.android.js')).toBeTruthy();
+        expect(hasteFS.getModuleName('/project/fruits/Orange.ios.js')).toBeTruthy();
+        expect(hasteFS.getModuleName('/project/fruits/Orange.android.js')).toBeTruthy();
         const iosVariant = moduleMap.getModule('Orange', 'ios');
         expect(iosVariant).toBe('/project/fruits/Orange.ios.js');
         const androidVariant = moduleMap.getModule('Orange', 'android');
@@ -1405,7 +1395,7 @@ describe('HasteMap', () => {
           MOCK_STAT_FILE,
         );
         const {hasteFS, moduleMap} = await waitForItToChange(hm);
-        expect(hasteFS.exists('fruits/another/Pear.js')).toBe(true);
+        expect(hasteFS.exists('/project/fruits/another/Pear.js')).toBe(true);
         try {
           moduleMap.getModule('Pear');
           throw new Error('should be unreachable');

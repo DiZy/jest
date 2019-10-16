@@ -1287,7 +1287,7 @@ describe('HasteMap', () => {
           type: 'change',
         },
       ]);
-      expect(hasteFS.getModuleName('fruits/Tomato.js')).not.toBeNull();
+      expect(hasteFS.getModuleName('/project/fruits/Tomato.js')).not.toBeNull();
       expect(moduleMap.getModule('Tomato')).toBeDefined();
       expect(moduleMap.getModule('Pear')).toBe('/project/fruits/Pear.js');
     });
@@ -1356,8 +1356,12 @@ describe('HasteMap', () => {
             type: 'change',
           },
         ]);
-        expect(hasteFS.getModuleName('fruits/Orange.ios.js')).toBeTruthy();
-        expect(hasteFS.getModuleName('fruits/Orange.android.js')).toBeTruthy();
+        expect(
+          hasteFS.getModuleName('/project/fruits/Orange.ios.js'),
+        ).toBeTruthy();
+        expect(
+          hasteFS.getModuleName('/project/fruits/Orange.android.js'),
+        ).toBeTruthy();
         const iosVariant = moduleMap.getModule('Orange', 'ios');
         expect(iosVariant).toBe('/project/fruits/Orange.ios.js');
         const androidVariant = moduleMap.getModule('Orange', 'android');
@@ -1393,7 +1397,7 @@ describe('HasteMap', () => {
           MOCK_STAT_FILE,
         );
         const {hasteFS, moduleMap} = await waitForItToChange(hm);
-        expect(hasteFS.exists('fruits/another/Pear.js')).toBe(true);
+        expect(hasteFS.exists('/project/fruits/another/Pear.js')).toBe(true);
         try {
           moduleMap.getModule('Pear');
           throw new Error('should be unreachable');

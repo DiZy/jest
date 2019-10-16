@@ -273,9 +273,6 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {
-    if(file.includes(this._rootDir)) {
-      return fastPath.relative(this._rootDir, file);
-    }
-    return file;
+    return fastPath.relative(this._rootDir, file);
   }
 }
