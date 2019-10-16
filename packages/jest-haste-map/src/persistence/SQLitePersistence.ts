@@ -1,4 +1,5 @@
 import * as v8 from 'v8';
+// import * as fs from 'fs';
 import betterSqlLite3 from 'better-sqlite3';
 import {
   InternalHasteMap,
@@ -14,18 +15,26 @@ import {
 } from '../types';
 import H from '../constants';
 import rimraf = require('rimraf');
+// import {regexPrepared} from './preparedStatements';
 
 class SQLitePersistence implements Persistence {
   findFilePathsBasedOnPattern(cachePath: string, pattern: string): Array<string> {
+
+    console.log("here");
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath, true);
 
-    if(!pattern.includes("%")) {
-      pattern = "%" + pattern + "%";
-    }
+    db.function('regex', function (filePath: string, pattern: string): string {
+      if (filePath.match(pattern)) {
+        return 'TRUE';
+      } else {
+        return 'FALSE';
+      }
+    });
+    console.log("here2");
 
     // Fetch files.
-    const filesArr: Array<any> = db.prepare(`SELECT filePath FROM files WHERE filePath LIKE ?`).all(pattern);
+    const filesArr: Array<any> =  db.prepare(`SELECT filePath FROM files WHERE regex(filePath, ?) = 'TRUE'`).all(pattern);
 
     return filesArr.map(file => file.filePath);
   }
@@ -468,6 +477,7 @@ class SQLitePersistence implements Persistence {
   }
 
   private getDatabase(cachePath: string, _mustExist: boolean) {
+    // let fileExists = fs.existsSync(cachePath);
     let db = betterSqlLite3(cachePath);
 
     try {
@@ -482,6 +492,7 @@ class SQLitePersistence implements Persistence {
       );`);
     } catch {
       rimraf.sync(cachePath);
+      // fileExists = false;
       db = betterSqlLite3(cachePath);
       db.exec(`CREATE TABLE IF NOT EXISTS files(
         filePath text PRIMARY KEY,
@@ -493,6 +504,16 @@ class SQLitePersistence implements Persistence {
         sha1 text
       );`);
     }
+    // if(!fileExists) {
+    //   console.log('doesnt exist');
+    //   db.function('regex', function (filePath: string, pattern: string): string {
+    //     if (filePath.match(pattern)) {
+    //       return 'TRUE';
+    //     } else {
+    //       return 'FALSE';
+    //     }
+    //   });
+    // }
     db.exec(`CREATE TABLE IF NOT EXISTS map(
       name text NOT NULL PRIMARY KEY,
       genericPath text,
@@ -519,6 +540,26 @@ class SQLitePersistence implements Persistence {
       relativeRoot text,
       since text
     );`);
+
+    // try {
+    //   // db.exec(`select regex('test', 'test')`);
+    //   db.function('regex', {deterministic: true}, (filePath, pattern) => {
+    //     if (filePath.match(pattern)) {
+    //       return 'TRUE';
+    //     } else {
+    //       return 'FALSE';
+    //     }
+    //   });
+    // } catch (e){
+    //   // console.log(e);
+    //   // db.function('regex', {deterministic: true}, (filePath, pattern) => {
+    //   //   if (filePath.match(pattern)) {
+    //   //     return 'TRUE';
+    //   //   } else {
+    //   //     return 'FALSE';
+    //   //   }
+    //   // });
+    // }
 
     return db;
   }
