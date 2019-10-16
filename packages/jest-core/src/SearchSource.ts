@@ -134,10 +134,14 @@ export default class SearchSource {
     return data;
   }
 
-  private _getAllTestPaths(testPathPattern?: string): SearchResult {
-    const files = testPathPattern ? 
-      this._context.hasteFS.matchFilesBasedOnRelativePath(testPathPattern) : 
-      this._context.hasteFS.getAllFiles();
+  private _getAllTestPaths(useSQLite: boolean, testPathPattern?: string): SearchResult {
+    let files;
+    if(useSQLite && testPathPattern) {
+      files = this._context.hasteFS.matchFilesBasedOnRelativePath(testPathPattern);
+    }
+    else {
+      files = this._context.hasteFS.getAllFiles();
+    }
     return this._filterTestPathsWithStats(
       toTests(this._context, files),
       testPathPattern,
@@ -148,8 +152,8 @@ export default class SearchSource {
     return this._testPathCases.every(testCase => testCase.isMatch(path));
   }
 
-  findMatchingTests(testPathPattern?: string): SearchResult {
-    return this._getAllTestPaths(testPathPattern);
+  findMatchingTests(useSQLite: boolean, testPathPattern?: string): SearchResult {
+    return this._getAllTestPaths(useSQLite, testPathPattern);
   }
 
   findRelatedTests(
@@ -274,7 +278,7 @@ export default class SearchSource {
         globalConfig.collectCoverage,
       );
     } else if (globalConfig.testPathPattern != null) {
-      return this.findMatchingTests(globalConfig.testPathPattern);
+      return this.findMatchingTests(globalConfig.useSQLite, globalConfig.testPathPattern);
     } else {
       return {tests: []};
     }
