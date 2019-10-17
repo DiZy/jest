@@ -11,7 +11,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import {skipSuiteOnWindows} from '@jest/test-utils';
 import { tmpdir } from 'os';
-import rimraf = require('rimraf');
+import rimraf from 'rimraf';
 
 const testDirectory = path.resolve(tmpdir(), 'jest-index-sql-test');
 const cacheFilePath = path.resolve(testDirectory, 'project');
@@ -22,6 +22,18 @@ function mockHashContents(contents) {
     .update(contents)
     .digest('hex');
 }
+
+// Needs to be mocked due to issues with better-sqlite3 in Jest
+jest.mock('../persistence/SQLitePersistence', () => {
+  const SQLitePersistence = jest.requireActual('../persistence/SQLitePersistence');
+  SQLitePersistence.default.findFilePathsBasedOnPattern = jest.fn((cachePath: string, pattern: string) => {
+    const allFiles = SQLitePersistence.default.readAllFiles(cachePath);
+    const filePaths: Array<string> = Array.from(allFiles.keys());
+    return filePaths.filter(file => 
+      SQLitePersistence.default.regexMatch(file, pattern) === 1);
+  });
+  return SQLitePersistence;
+})
 
 jest.mock('child_process', () => ({
   // If this does not throw, we'll use the (mocked) watchman crawler

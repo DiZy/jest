@@ -1,5 +1,4 @@
 import * as v8 from 'v8';
-// import * as fs from 'fs';
 import betterSqlLite3 from 'better-sqlite3';
 import {
   InternalHasteMap,
@@ -15,26 +14,44 @@ import {
 } from '../types';
 import H from '../constants';
 import rimraf = require('rimraf');
-// import {regexPrepared} from './preparedStatements';
+
+const openDatabases: Map<string, betterSqlLite3.Database> = new Map();
+const regexps: Map<string, RegExp> = new Map();
 
 class SQLitePersistence implements Persistence {
+  regexMatch(filePath: string, pattern: string): number {
+    let insensitivePattern = regexps.get(pattern);
+    if(!insensitivePattern) {
+      insensitivePattern =  new RegExp(pattern, 'i');
+      regexps.set(pattern, insensitivePattern);
+    }
+
+    if (filePath.match(insensitivePattern)) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
   findFilePathsBasedOnPattern(cachePath: string, pattern: string): Array<string> {
 
-    console.log("here");
     // Get database, throw if does not exist.
-    const db = this.getDatabase(cachePath, true);
+    const db = this.getDatabase(cachePath);
 
-    db.function('regex', function (filePath: string, pattern: string): string {
-      if (filePath.match(pattern)) {
-        return 'TRUE';
-      } else {
-        return 'FALSE';
-      }
-    });
-    console.log("here2");
+    db.function('regex', this.regexMatch);
 
     // Fetch files.
-    const filesArr: Array<any> =  db.prepare(`SELECT filePath FROM files WHERE regex(filePath, ?) = 'TRUE'`).all(pattern);
+    let filesArr;
+    if (pattern === '\\.snap$') {
+      filesArr = db
+        .prepare(`SELECT filePath FROM files WHERE filePath LIKE '%.snap'`)
+        .all();
+    } else {
+      filesArr = db
+        .prepare(`SELECT filePath FROM files WHERE regex(filePath, ?) = 1`)
+        .all(pattern);
+    }
+    filesArr = db.prepare(`SELECT filePath FROM files WHERE regex(filePath, ?) = 1`).all(pattern);
 
     return filesArr.map(file => file.filePath);
   }
@@ -96,7 +113,7 @@ class SQLitePersistence implements Persistence {
   }
 
   writeFileData(cachePath: string, data: FilePersistenceData): void {
-    const db = this.getDatabase(cachePath, false);
+    const db = this.getDatabase(cachePath);
     const {changedFiles, removedFiles, isFresh} = data;
 
     db.transaction(() => {
@@ -134,13 +151,11 @@ class SQLitePersistence implements Persistence {
         runFileStmt(upsertFileStmt, file);
       }
     })();
-
-    db.close();
   }
   
   getFileMetadata(cachePath:string, filePath: string): FileMetaData | undefined {
     // Get database, throw if does not exist.
-    const db = this.getDatabase(cachePath, true);
+    const db = this.getDatabase(cachePath);
 
     // Fetch files.
     const file: {
@@ -162,7 +177,7 @@ class SQLitePersistence implements Persistence {
 
   setFileMetadata(cachePath:string, filePath: string, fileMetadata: FileMetaData) {
     // Get database, throw if does not exist.
-    const db = this.getDatabase(cachePath, true);
+    const db = this.getDatabase(cachePath);
     
     // Upsert changedFiles
     const upsertFileStmt = db.prepare(
@@ -182,7 +197,7 @@ class SQLitePersistence implements Persistence {
 
   deleteFileMetadata(cachePath: string, filePath: string) {
     // Get database, throw if does not exist.
-    const db = this.getDatabase(cachePath, true);
+    const db = this.getDatabase(cachePath);
 
     // Fetch files.
     db.prepare(`DELETE FROM files WHERE filePath = ?`).run(filePath);
@@ -190,7 +205,7 @@ class SQLitePersistence implements Persistence {
 
   readAllFiles(cachePath: string): FileData {
     // Get database, throw if does not exist.
-    const db = this.getDatabase(cachePath, true);
+    const db = this.getDatabase(cachePath);
 
     // Fetch files.
     const filesArr: Array<{
@@ -220,7 +235,7 @@ class SQLitePersistence implements Persistence {
 
   readInternalHasteMap(cachePath: string): InternalHasteMap {
     // Get database, throw if does not exist.
-    const db = this.getDatabase(cachePath, false);
+    const db = this.getDatabase(cachePath);
 
     // Create empty map to populate.
     const internalHasteMap: InternalHasteMap = {
@@ -276,14 +291,11 @@ class SQLitePersistence implements Persistence {
 
     internalHasteMap.clocks = this.getClocks(cachePath);
 
-    // Close database connection,
-    db.close();
-
     return internalHasteMap;
   }
 
   writeModuleMapData(cachePath: string, moduleMapData: SQLiteCache) {
-    const db = this.getDatabase(cachePath, false);
+    const db = this.getDatabase(cachePath);
     
     db.transaction(() => {
       if(moduleMapData.mocksAreCleared) {
@@ -388,13 +400,11 @@ class SQLitePersistence implements Persistence {
         insertClock.run(relativeRoot, since);
       }
     })();
-
-    db.close();
   }
 
   getClocks(cachePath: string): WatchmanClocks {
     // Fetch clocks.
-    const db = this.getDatabase(cachePath, false);
+    const db = this.getDatabase(cachePath);
     const clocks: WatchmanClocks = new Map();
     const clocksArr: Array<{
       relativeRoot: string;
@@ -403,25 +413,22 @@ class SQLitePersistence implements Persistence {
     for (const clock of clocksArr) {
       clocks.set(clock.relativeRoot, clock.since);
     }
-    db.close();
     return clocks;
   }
 
   getMock(cachePath: string, name: string): string | undefined {
-    const db = this.getDatabase(cachePath, false);
+    const db = this.getDatabase(cachePath);
     // Fetch mocks.
     const mock: {
       name: string;
       filePath: string;
     } | undefined = db.prepare(`SELECT * FROM mocks where name = ?`).get(name);
 
-    db.close();
-
     return mock ? mock.filePath : undefined;
   }
 
   getFromModuleMap(cachePath: string, name: string): ModuleMapItem | undefined {
-    const db = this.getDatabase(cachePath, false);
+    const db = this.getDatabase(cachePath);
     // Fetch map.
     const map: {
       name: string;
@@ -453,13 +460,11 @@ class SQLitePersistence implements Persistence {
       mapItem[H.ANDROID_PLATFORM] = [map.androidPath, map.androidType];
     }
 
-    db.close();
-
     return mapItem;
   }
 
   getAllDuplicates(cachePath: string) {
-    const db = this.getDatabase(cachePath, false);
+    const db = this.getDatabase(cachePath);
     const duplicates : DuplicatesIndex = new Map();
 
     // Fetch duplicates.
@@ -476,9 +481,13 @@ class SQLitePersistence implements Persistence {
     return duplicates;
   }
 
-  private getDatabase(cachePath: string, _mustExist: boolean) {
-    // let fileExists = fs.existsSync(cachePath);
-    let db = betterSqlLite3(cachePath);
+  private getDatabase(cachePath: string): betterSqlLite3.Database{
+    let db = openDatabases.get(cachePath);
+    if (db) {
+      return db;
+    }
+
+    db = betterSqlLite3(cachePath);
 
     try {
       db.exec(`CREATE TABLE IF NOT EXISTS files(
@@ -504,16 +513,7 @@ class SQLitePersistence implements Persistence {
         sha1 text
       );`);
     }
-    // if(!fileExists) {
-    //   console.log('doesnt exist');
-    //   db.function('regex', function (filePath: string, pattern: string): string {
-    //     if (filePath.match(pattern)) {
-    //       return 'TRUE';
-    //     } else {
-    //       return 'FALSE';
-    //     }
-    //   });
-    // }
+
     db.exec(`CREATE TABLE IF NOT EXISTS map(
       name text NOT NULL PRIMARY KEY,
       genericPath text,
@@ -541,25 +541,7 @@ class SQLitePersistence implements Persistence {
       since text
     );`);
 
-    // try {
-    //   // db.exec(`select regex('test', 'test')`);
-    //   db.function('regex', {deterministic: true}, (filePath, pattern) => {
-    //     if (filePath.match(pattern)) {
-    //       return 'TRUE';
-    //     } else {
-    //       return 'FALSE';
-    //     }
-    //   });
-    // } catch (e){
-    //   // console.log(e);
-    //   // db.function('regex', {deterministic: true}, (filePath, pattern) => {
-    //   //   if (filePath.match(pattern)) {
-    //   //     return 'TRUE';
-    //   //   } else {
-    //   //     return 'FALSE';
-    //   //   }
-    //   // });
-    // }
+    openDatabases.set(cachePath, db);
 
     return db;
   }
