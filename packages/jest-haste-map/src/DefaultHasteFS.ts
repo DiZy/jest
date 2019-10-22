@@ -100,15 +100,14 @@ export default class DefaultHasteFS implements HasteFS {
     return FilePersistence.createFilePersistenceData(this._cachePath, fileCrawlData, this._hasteMap.files);
   }
 
-  updateFileData(filePersistenceData: FilePersistenceData) {
-    try {
-      this._hasteMap.files = filePersistenceData.finalFiles!;
-    } catch {
-      throw new Error("FilePersistence updateFileData was called without finalFiles");
+  persist(filePersistenceData?: FilePersistenceData): void {
+    if (filePersistenceData) {
+      try {
+        this._hasteMap.files = filePersistenceData.finalFiles!;
+      } catch {
+        throw new Error("FilePersistence updateFileData was called without finalFiles");
+      }
     }
-  }
-
-  persist(): void {
     FilePersistence.persist(this._cachePath, this._hasteMap);
   }
 

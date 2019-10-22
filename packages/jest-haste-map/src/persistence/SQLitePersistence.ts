@@ -111,47 +111,6 @@ class SQLitePersistence implements Persistence {
     }
     return filePersistenceData;
   }
-
-  writeFileData(cachePath: string, data: FilePersistenceData): void {
-    const db = this.getDatabase(cachePath);
-    const {changedFiles, removedFiles, isFresh} = data;
-
-    db.transaction(() => {
-      // Incrementally update files.
-      const runFileStmt = (
-        stmt: betterSqlLite3.Statement,
-        [filePath, file]: [string, FileMetaData],
-      ) => {
-        stmt.run(
-          filePath,
-          file[H.ID],
-          file[H.MTIME],
-          file[H.SIZE],
-          file[H.VISITED],
-          file[H.DEPENDENCIES],
-          file[H.SHA1],
-        );
-      };
-      
-      // Remove files as necessary
-      if (isFresh) {
-        db.exec('DELETE FROM files');
-      } else {
-        const removeFileStmt = db.prepare(`DELETE FROM files WHERE filePath=?`);
-        for (const filePath of removedFiles) {
-          removeFileStmt.run(filePath);
-        }
-      }
-
-      // Upsert changedFiles
-      const upsertFileStmt = db.prepare(
-        `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      );
-      for (const file of changedFiles) {
-        runFileStmt(upsertFileStmt, file);
-      }
-    })();
-  }
   
   getFileMetadata(cachePath:string, filePath: string): FileMetaData | undefined {
     // Get database, throw if does not exist.
@@ -294,10 +253,48 @@ class SQLitePersistence implements Persistence {
     return internalHasteMap;
   }
 
-  writeModuleMapData(cachePath: string, moduleMapData: SQLiteCache) {
+  writeModuleMapData(cachePath: string, moduleMapData: SQLiteCache, filePersistenceData?: FilePersistenceData) {
     const db = this.getDatabase(cachePath);
     
     db.transaction(() => {
+      if (filePersistenceData) {
+        const {changedFiles, removedFiles, isFresh} = filePersistenceData;
+
+        // Incrementally update files.
+        const runFileStmt = (
+          stmt: betterSqlLite3.Statement,
+          [filePath, file]: [string, FileMetaData],
+        ) => {
+          stmt.run(
+            filePath,
+            file[H.ID],
+            file[H.MTIME],
+            file[H.SIZE],
+            file[H.VISITED],
+            file[H.DEPENDENCIES],
+            file[H.SHA1],
+          );
+        };
+        
+        // Remove files as necessary
+        if (isFresh) {
+          db.exec('DELETE FROM files');
+        } else {
+          const removeFileStmt = db.prepare(`DELETE FROM files WHERE filePath=?`);
+          for (const filePath of removedFiles) {
+            removeFileStmt.run(filePath);
+          }
+        }
+
+        // Upsert changedFiles
+        const upsertFileStmt = db.prepare(
+          `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        );
+        for (const file of changedFiles) {
+          runFileStmt(upsertFileStmt, file);
+        }
+      }
+
       if(moduleMapData.mocksAreCleared) {
         // Remove all mocks
         db.exec('DELETE FROM mocks');

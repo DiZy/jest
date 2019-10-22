@@ -45,6 +45,7 @@ import {
   FileCrawlData,
   ModuleMapItem,
   WatchmanClocks,
+  FilePersistenceData,
 } from './types';
 import getPersistence from './persistence/getPersistence';
 import HasteFS from './HasteFS';
@@ -384,8 +385,8 @@ class HasteMap extends EventEmitter {
           fileCrawlData.changedFiles.size > 0 ||
           fileCrawlData.removedFiles.size > 0
         ) {
-          await this._buildHasteMap(hasteFS, fileCrawlData);
-          hasteFS.persist();
+          const filePersistenceData = await this._buildHasteMap(hasteFS, fileCrawlData);
+          hasteFS.persist(filePersistenceData);
         }
 
         const moduleMap = this.createHasteModuleMap(hasteFS);
@@ -675,7 +676,7 @@ class HasteMap extends EventEmitter {
   private _buildHasteMap(
     hasteFS: HasteFS,
     fileCrawlData: FileCrawlData,
-    ): Promise<void> {
+    ): Promise<FilePersistenceData> {
 
     let oldModuleMapData = new Map<string, ModuleMapItem>();
 
@@ -763,7 +764,7 @@ class HasteMap extends EventEmitter {
     return Promise.all(promises).then(
       () => {
         this._cleanup();
-        hasteFS.updateFileData(filePersistenceData);
+        return filePersistenceData;
       },
       error => {
         this._cleanup();

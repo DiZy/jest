@@ -14,9 +14,7 @@ export default interface HasteFS {
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData;
 
-  updateFileData(filePersistenceData: FilePersistenceData): void;
-
-  persist(): void;
+  persist(filePersistenceData?: FilePersistenceData): void;
 
   getModuleName: (file: Config.Path) => string | null;
 

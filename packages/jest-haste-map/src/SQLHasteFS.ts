@@ -46,13 +46,9 @@ export default class SQLHasteFS implements HasteFS {
     return SQLitePersistence.createFilePersistenceData(this._cachePath, fileCrawlData);
   }
 
-  updateFileData(data: FilePersistenceData): void {
-    return SQLitePersistence.writeFileData(this._cachePath, data);
-  };
-
-  persist(): void {
+  persist(filePersistenceData?: FilePersistenceData): void {
     // Files are already persisted on updateFileData, so only persist ModuleMap
-    SQLitePersistence.writeModuleMapData(this._cachePath, this._localCache);
+    SQLitePersistence.writeModuleMapData(this._cachePath, this._localCache, filePersistenceData);
   }
   
   getClocks(): WatchmanClocks {
