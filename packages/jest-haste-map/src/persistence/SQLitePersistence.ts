@@ -51,7 +51,6 @@ class SQLitePersistence implements Persistence {
         .prepare(`SELECT filePath FROM files WHERE regex(filePath, ?) = 1`)
         .all(pattern);
     }
-    filesArr = db.prepare(`SELECT filePath FROM files WHERE regex(filePath, ?) = 1`).all(pattern);
 
     return filesArr.map(file => file.filePath);
   }
@@ -253,7 +252,7 @@ class SQLitePersistence implements Persistence {
     return internalHasteMap;
   }
 
-  writeModuleMapData(cachePath: string, moduleMapData: SQLiteCache, filePersistenceData?: FilePersistenceData) {
+  persist(cachePath: string, moduleMapData: SQLiteCache, filePersistenceData?: FilePersistenceData) {
     const db = this.getDatabase(cachePath);
     
     db.transaction(() => {
