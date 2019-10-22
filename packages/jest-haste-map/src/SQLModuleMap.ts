@@ -15,11 +15,11 @@ const EMPTY_OBJ = {} as Record<string, any>;
 const EMPTY_MAP = new Map();
 const NON_EXISTENT_IN_SQL = "NON_EXISTENT_IN_SQL";
 
+const sqlCaches: Map<string, RawModuleMap> = new Map();
+
 export default class SQLModuleMap extends ModuleMap {
     private readonly _cachePath: Config.Path;
     private readonly _rootDir: Config.Path;
-    private serialized: SerializableModuleMap | undefined;
-    private _sqlCache: RawModuleMap;
   
     constructor(rootDir: Config.Path, cachePath: Config.Path) {
       const emptyMap : RawModuleMap = {
@@ -29,11 +29,14 @@ export default class SQLModuleMap extends ModuleMap {
         mocks: new Map(),
       };
       super(emptyMap);
+
+      console.log(cachePath);
       
       this._rootDir = rootDir;
       this._cachePath = cachePath;
+      console.log(sqlCaches.get(cachePath));
 
-      this._sqlCache = emptyMap;
+      sqlCaches.set(cachePath, emptyMap);
     }
   
     getModule (
@@ -63,7 +66,7 @@ export default class SQLModuleMap extends ModuleMap {
     }
   
     getMockModule(name: string): Config.Path | undefined {
-      let mockPath = this._sqlCache.mocks.get(name);
+      let mockPath = sqlCaches.get(this._cachePath)!.mocks.get(name);
       if(mockPath === NON_EXISTENT_IN_SQL) {
         return undefined;
       }
@@ -75,23 +78,19 @@ export default class SQLModuleMap extends ModuleMap {
         mockPath = SQLitePersistence.getMock(this._cachePath, name + '/index');
       };
 
-      this._sqlCache.mocks.set(name, mockPath || NON_EXISTENT_IN_SQL);
+      sqlCaches.get(this._cachePath)!.mocks.set(name, mockPath || NON_EXISTENT_IN_SQL);
       return mockPath && fastPath.resolve(this._rootDir, mockPath);
     }
   
     toJSON(): SerializableModuleMap {
-      if (!this.serialized) {
-        const hasteMap = SQLitePersistence.readInternalHasteMap(this._cachePath);
-        this.serialized = {
-          duplicates: ModuleMap.mapToArrayRecursive(
-            hasteMap.duplicates,
-          ) as SerializableModuleMap['duplicates'],
-          map: Array.from(hasteMap.map),
-          mocks: Array.from(hasteMap.mocks),
-          rootDir: this._rootDir,
-        };
+      console.log('test');
+      return {
+        duplicates: [],
+        map: [],
+        mocks: [],
+        rootDir: this._rootDir,
+        sqlDbPath: this._cachePath,
       }
-      return this.serialized;
     }
   
     private _getModuleMetadataFromSQL(
@@ -100,13 +99,14 @@ export default class SQLModuleMap extends ModuleMap {
       supportsNativePlatform: boolean
       ): ModuleMetaData | null {
       let map: ModuleMapItem;
-      if(this._sqlCache.map.get(name)) {
-        map = this._sqlCache.map.get(name) || EMPTY_OBJ;
+      if(sqlCaches.get(this._cachePath)!.map.get(name)) {
+        map = sqlCaches.get(this._cachePath)!.map.get(name) || EMPTY_OBJ;
       } else {
+        // console.log('not in cache: ' + name);
         map = SQLitePersistence.getFromModuleMap(this._cachePath, name) || EMPTY_OBJ;
-        this._sqlCache.map.set(name, map);
+        sqlCaches.get(this._cachePath)!.map.set(name, map);
       }
-      const dupMap = this._sqlCache.duplicates.get(name) || EMPTY_MAP;
+      const dupMap = sqlCaches.get(this._cachePath)!.duplicates.get(name) || EMPTY_MAP;
   
       if (platform != null) {
         super._assertNoDuplicates(

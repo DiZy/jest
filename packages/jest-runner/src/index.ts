@@ -116,9 +116,11 @@ class TestRunner {
     const resolvers: Map<string, SerializableResolver> = new Map();
     for (const test of tests) {
       if (!resolvers.has(test.context.config.name)) {
+        const serializable = test.context.moduleMap.toJSON();
         resolvers.set(test.context.config.name, {
           config: test.context.config,
-          serializableModuleMap: test.context.moduleMap.toJSON(),
+          serializableModuleMap: serializable.sqlDbPath ? undefined : serializable,
+          sqlDbPath: serializable.sqlDbPath,
         });
       }
     }

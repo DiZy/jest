@@ -28,6 +28,7 @@ export type SerializableModuleMap = {
   map: ReadonlyArray<[string, ValueType<ModuleMapData>]>;
   mocks: ReadonlyArray<[string, ValueType<MockData>]>;
   rootDir: Config.Path;
+  sqlDbPath?: Config.Path;
 };
 
 export default class ModuleMap {
@@ -47,7 +48,7 @@ export default class ModuleMap {
     return arr;
   }
 
-  private static mapFromArrayRecursive(
+  static mapFromArrayRecursive(
     arr: ReadonlyArray<[string, unknown]>,
   ): Map<string, unknown> {
     if (arr[0] && Array.isArray(arr[1])) {
@@ -110,17 +111,6 @@ export default class ModuleMap {
       };
     }
     return this.json;
-  }
-
-  static fromJSON(serializableModuleMap: SerializableModuleMap) {
-    return new ModuleMap({
-      duplicates: ModuleMap.mapFromArrayRecursive(
-        serializableModuleMap.duplicates,
-      ) as RawModuleMap['duplicates'],
-      map: new Map(serializableModuleMap.map),
-      mocks: new Map(serializableModuleMap.mocks),
-      rootDir: serializableModuleMap.rootDir,
-    });
   }
 
   /**

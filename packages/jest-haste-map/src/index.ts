@@ -46,10 +46,11 @@ import {
   ModuleMapItem,
   WatchmanClocks,
   FilePersistenceData,
+  RawModuleMap,
 } from './types';
 import getPersistence from './persistence/getPersistence';
 import HasteFS from './HasteFS';
-
+import DefaultModuleMap from './ModuleMap';
 type HType = typeof H;
 
 type Options = {
@@ -342,6 +343,24 @@ class HasteMap extends EventEmitter {
         hash.digest('hex')
       ].join('-'),
     );
+  }
+
+  static createHasteModuleMapFromSerializable(serializableModuleMap?: HasteSerializableModuleMap, sqlInfo?: {sqlDbPath: string, rootDir: string}) {
+    if (serializableModuleMap) {
+      return new DefaultModuleMap({
+        duplicates: DefaultModuleMap.mapFromArrayRecursive(
+          serializableModuleMap.duplicates,
+        ) as RawModuleMap['duplicates'],
+        map: new Map(serializableModuleMap.map),
+        mocks: new Map(serializableModuleMap.mocks),
+        rootDir: serializableModuleMap.rootDir,
+      });
+    } else if (sqlInfo) {
+      const SQLModuleMap = require('./SQLModuleMap').default;
+      return new SQLModuleMap(sqlInfo.rootDir, sqlInfo.sqlDbPath);
+    } else {
+      throw 'Failed to deserialize module map';
+    }
   }
 
   getCacheFilePath(): string {

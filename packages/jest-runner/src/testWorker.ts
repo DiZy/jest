@@ -9,6 +9,7 @@
 import {Config} from '@jest/types';
 import {SerializableError, TestResult} from '@jest/test-result';
 import HasteMap = require('jest-haste-map');
+// import {SQLBasedModuleMap} from 'jest-haste-map';
 import exit = require('exit');
 import {separateMessageFromStack} from 'jest-message-util';
 import Runtime = require('jest-runtime');
@@ -18,7 +19,8 @@ import runTest from './runTest';
 
 export type SerializableResolver = {
   config: Config.ProjectConfig;
-  serializableModuleMap: HasteMap.SerializableModuleMap;
+  serializableModuleMap?: HasteMap.SerializableModuleMap;
+  sqlDbPath?: Config.Path;
 };
 
 type WorkerData = {
@@ -68,9 +70,17 @@ export function setup(setupData: {
   for (const {
     config,
     serializableModuleMap,
+    sqlDbPath,
   } of setupData.serializableResolvers) {
-    const moduleMap = HasteMap.ModuleMap.fromJSON(serializableModuleMap);
-    resolvers.set(config.name, Runtime.createResolver(config, moduleMap));
+    if (sqlDbPath) { 
+      const moduleMap = HasteMap.createHasteModuleMapFromSerializable(undefined, {sqlDbPath, rootDir: config.rootDir});
+      resolvers.set(config.name, Runtime.createResolver(config, moduleMap));
+    } else if(serializableModuleMap) {
+      const moduleMap = HasteMap.createHasteModuleMapFromSerializable(serializableModuleMap);
+      resolvers.set(config.name, Runtime.createResolver(config, moduleMap));
+    } else {
+      throw 'TestWorker was not given a serializableResolver or sqlDbPath';
+    }
   }
 }
 
