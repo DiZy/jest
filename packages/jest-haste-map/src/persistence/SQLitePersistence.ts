@@ -396,6 +396,8 @@ class SQLitePersistence implements Persistence {
         insertClock.run(relativeRoot, since);
       }
     })();
+
+    this.closeDatabase(cachePath);
   }
 
   getClocks(cachePath: string): WatchmanClocks {
@@ -477,13 +479,23 @@ class SQLitePersistence implements Persistence {
     return duplicates;
   }
 
+  private closeDatabase(cachePath: string): void {
+    let db = openDatabases.get(cachePath);
+    if (!db) {
+      return;
+    }
+
+    db.close();
+    openDatabases.delete(cachePath);
+  }
+
   private getDatabase(cachePath: string): betterSqlLite3.Database{
     let db = openDatabases.get(cachePath);
     if (db) {
       return db;
     }
 
-    db = betterSqlLite3(cachePath);
+    db = betterSqlLite3(cachePath, {timeout: 15000});
 
     try {
       db.exec(`CREATE TABLE IF NOT EXISTS files(
