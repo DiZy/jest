@@ -21,7 +21,7 @@ import getPlatformExtension from './lib/getPlatformExtension';
 import H from './constants';
 import DefaultHasteFS from './DefaultHasteFS';
 import HasteModuleMap, {
-  SerializableModuleMap as HasteSerializableModuleMap,
+  SerializableModuleMap as HasteSerializableModuleMap, SerializableModuleMap, SerializableSQLModuleMap, DefaultSerializableModuleMap,
 } from './ModuleMap';
 import nodeCrawl = require('./crawlers/node');
 import normalizePathSep from './lib/normalizePathSep';
@@ -342,6 +342,19 @@ class HasteMap extends EventEmitter {
         hash.digest('hex')
       ].join('-'),
     );
+  }
+
+  static deserializeModuleMap(serializable: SerializableModuleMap) {
+    if ((serializable as DefaultSerializableModuleMap).map) {
+      console.log(serializable);
+      return HasteModuleMap.fromJSON(serializable as DefaultSerializableModuleMap);
+    } else if ((serializable as SerializableSQLModuleMap).cachePath) {
+      serializable = serializable as SerializableSQLModuleMap;
+      const SQLModuleMap = require('./SQLModuleMap').default;
+      return new SQLModuleMap(serializable.rootDir, serializable.cachePath);
+    } else {
+      throw 'Failed to deserialize module map';
+    }
   }
 
   getCacheFilePath(): string {

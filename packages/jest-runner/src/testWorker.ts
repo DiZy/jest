@@ -69,7 +69,7 @@ export function setup(setupData: {
     config,
     serializableModuleMap,
   } of setupData.serializableResolvers) {
-    const moduleMap = HasteMap.ModuleMap.fromJSON(serializableModuleMap);
+    const moduleMap = HasteMap.deserializeModuleMap(serializableModuleMap);
     resolvers.set(config.name, Runtime.createResolver(config, moduleMap));
   }
 }

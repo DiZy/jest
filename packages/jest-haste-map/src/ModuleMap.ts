@@ -23,12 +23,19 @@ const EMPTY_MAP = new Map();
 
 type ValueType<T> = T extends Map<string, infer V> ? V : never;
 
-export type SerializableModuleMap = {
+export type SerializableModuleMap = DefaultSerializableModuleMap | SerializableSQLModuleMap;
+
+export type DefaultSerializableModuleMap = {
   duplicates: ReadonlyArray<[string, [string, [string, [string, number]]]]>;
   map: ReadonlyArray<[string, ValueType<ModuleMapData>]>;
   mocks: ReadonlyArray<[string, ValueType<MockData>]>;
   rootDir: Config.Path;
 };
+
+export type SerializableSQLModuleMap = {
+  cachePath: Config.Path,
+  rootDir: Config.Path,
+}
 
 export default class ModuleMap {
   static DuplicateHasteCandidatesError: typeof DuplicateHasteCandidatesError;
@@ -103,7 +110,7 @@ export default class ModuleMap {
       this.json = {
         duplicates: ModuleMap.mapToArrayRecursive(
           this._raw.duplicates,
-        ) as SerializableModuleMap['duplicates'],
+        ) as DefaultSerializableModuleMap['duplicates'],
         map: Array.from(this._raw.map),
         mocks: Array.from(this._raw.mocks),
         rootDir: this._raw.rootDir,
@@ -112,7 +119,7 @@ export default class ModuleMap {
     return this.json;
   }
 
-  static fromJSON(serializableModuleMap: SerializableModuleMap) {
+  static fromJSON(serializableModuleMap: DefaultSerializableModuleMap) {
     return new ModuleMap({
       duplicates: ModuleMap.mapFromArrayRecursive(
         serializableModuleMap.duplicates,

@@ -18,7 +18,6 @@ const NON_EXISTENT_IN_SQL = "NON_EXISTENT_IN_SQL";
 export default class SQLModuleMap extends ModuleMap {
     private readonly _cachePath: Config.Path;
     private readonly _rootDir: Config.Path;
-    private serialized: SerializableModuleMap | undefined;
     private _sqlCache: RawModuleMap;
   
     constructor(rootDir: Config.Path, cachePath: Config.Path) {
@@ -80,18 +79,10 @@ export default class SQLModuleMap extends ModuleMap {
     }
   
     toJSON(): SerializableModuleMap {
-      if (!this.serialized) {
-        const hasteMap = SQLitePersistence.readInternalHasteMap(this._cachePath);
-        this.serialized = {
-          duplicates: ModuleMap.mapToArrayRecursive(
-            hasteMap.duplicates,
-          ) as SerializableModuleMap['duplicates'],
-          map: Array.from(hasteMap.map),
-          mocks: Array.from(hasteMap.mocks),
-          rootDir: this._rootDir,
-        };
-      }
-      return this.serialized;
+      return {
+        cachePath: this._cachePath,
+        rootDir: this._rootDir,
+      };
     }
   
     private _getModuleMetadataFromSQL(
