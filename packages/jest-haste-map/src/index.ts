@@ -21,7 +21,7 @@ import getPlatformExtension from './lib/getPlatformExtension';
 import H from './constants';
 import DefaultHasteFS from './DefaultHasteFS';
 import HasteModuleMap, {
-  SerializableModuleMap as HasteSerializableModuleMap, SerializableModuleMap, SerializableSQLModuleMap, DefaultSerializableModuleMap,
+  SerializableModuleMap as HasteSerializableModuleMap, SQLSerializableModuleMap, DefaultSerializableModuleMap,
 } from './ModuleMap';
 import nodeCrawl = require('./crawlers/node');
 import normalizePathSep from './lib/normalizePathSep';
@@ -344,12 +344,11 @@ class HasteMap extends EventEmitter {
     );
   }
 
-  static deserializeModuleMap(serializable: SerializableModuleMap) {
+  static deserializeModuleMap(serializable: HasteSerializableModuleMap) {
     if ((serializable as DefaultSerializableModuleMap).map) {
-      console.log(serializable);
       return HasteModuleMap.fromJSON(serializable as DefaultSerializableModuleMap);
-    } else if ((serializable as SerializableSQLModuleMap).cachePath) {
-      serializable = serializable as SerializableSQLModuleMap;
+    } else if ((serializable as SQLSerializableModuleMap).cachePath) {
+      serializable = serializable as SQLSerializableModuleMap;
       const SQLModuleMap = require('./SQLModuleMap').default;
       return new SQLModuleMap(serializable.rootDir, serializable.cachePath);
     } else {
@@ -826,7 +825,7 @@ class HasteMap extends EventEmitter {
     const crawlerOptions: CrawlerOptions = {
       computeSha1: options.computeSha1,
       clocks,
-      extensions: options.extensions,
+      extensions: options.extensions, 
       forceNodeFilesystemAPI: options.forceNodeFilesystemAPI,
       ignore,
       mapper: options.mapper,

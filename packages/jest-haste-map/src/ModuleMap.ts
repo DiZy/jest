@@ -23,7 +23,7 @@ const EMPTY_MAP = new Map();
 
 type ValueType<T> = T extends Map<string, infer V> ? V : never;
 
-export type SerializableModuleMap = DefaultSerializableModuleMap | SerializableSQLModuleMap;
+export type SerializableModuleMap = DefaultSerializableModuleMap | SQLSerializableModuleMap;
 
 export type DefaultSerializableModuleMap = {
   duplicates: ReadonlyArray<[string, [string, [string, [string, number]]]]>;
@@ -32,7 +32,7 @@ export type DefaultSerializableModuleMap = {
   rootDir: Config.Path;
 };
 
-export type SerializableSQLModuleMap = {
+export type SQLSerializableModuleMap = {
   cachePath: Config.Path,
   rootDir: Config.Path,
 }
