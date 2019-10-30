@@ -583,6 +583,18 @@ export default function normalize(
             );
         }
         break;
+      case 'customCrawler':
+        {
+          const option = oldOptions[key];
+          value =
+            option &&
+            resolve(newOptions.resolver, {
+              filePath: option,
+              key,
+              rootDir: options.rootDir,
+            });
+        }
+        break;
       case 'dependencyExtractor':
       case 'globalSetup':
       case 'globalTeardown':

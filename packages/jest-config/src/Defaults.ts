@@ -26,6 +26,7 @@ const defaultOptions: Config.DefaultOptions = {
   coveragePathIgnorePatterns: [NODE_MODULES_REGEXP],
   coverageReporters: ['json', 'text', 'lcov', 'clover'],
   coverageThreshold: null,
+  customCrawler: null,
   dependencyExtractor: null,
   errorOnDeprecated: false,
   expand: false,

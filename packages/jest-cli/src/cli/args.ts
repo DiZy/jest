@@ -215,6 +215,14 @@ export const options = {
       'minimum threshold enforcement for coverage results',
     type: 'string',
   },
+  customCrawler: {
+    default: undefined,
+    description:
+      'Path to a module exporting a crawl function. This method receives ' +
+      'CrawlerOptions and returns a Promise for FileCrawlData as defined ' +
+      'in the jest-haste-map types.',
+    type: 'string',
+  },
   debug: {
     default: undefined,
     description: 'Print debugging info about your jest config.',

@@ -238,6 +238,7 @@ class Runtime {
       cacheDirectory: config.cacheDirectory,
       computeSha1: config.haste.computeSha1,
       console: options && options.console,
+      customCrawler: config.customCrawler,
       dependencyExtractor: config.dependencyExtractor,
       extensions: [Snapshot.EXTENSION].concat(config.moduleFileExtensions),
       hasteImplModulePath: config.haste.hasteImplModulePath,

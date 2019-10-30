@@ -57,6 +57,7 @@ type Options = {
   computeDependencies?: boolean;
   computeSha1?: boolean;
   console?: Console;
+  customCrawler?: Config.Path | null | undefined;
   dependencyExtractor?: string;
   extensions: Array<string>;
   forceNodeFilesystemAPI?: boolean;
@@ -83,6 +84,7 @@ type InternalOptions = {
   cacheDirectory: string;
   computeDependencies: boolean;
   computeSha1: boolean;
+  customCrawler?: Config.Path;
   dependencyExtractor?: string;
   extensions: Array<string>;
   forceNodeFilesystemAPI: boolean;
@@ -256,6 +258,7 @@ class HasteMap extends EventEmitter {
           ? true
           : options.computeDependencies,
       computeSha1: options.computeSha1 || false,
+      customCrawler: options.customCrawler || undefined,
       dependencyExtractor: options.dependencyExtractor,
       extensions: options.extensions,
       forceNodeFilesystemAPI: !!options.forceNodeFilesystemAPI,
@@ -385,7 +388,7 @@ class HasteMap extends EventEmitter {
           });
         }
 
-        const fileCrawlData = await this._crawl(hasteFS.getClocks());
+        const fileCrawlData = await this._crawl(hasteFS.getClocks(), this._options.customCrawler);
         if(fileCrawlData.newClocks) {
           hasteFS.setClocks(fileCrawlData.newClocks);
         }
@@ -695,6 +698,7 @@ class HasteMap extends EventEmitter {
     let filePersistenceData = hasteFS.createFilePersistenceData(fileCrawlData);
 
     let filesToProcess: FileData = filePersistenceData.changedFiles;
+
     const removedFiles = filePersistenceData.removedFiles;
 
     if (fileCrawlData.isFresh) {
@@ -817,11 +821,23 @@ class HasteMap extends EventEmitter {
     return this._worker;
   }
 
-  private _crawl(clocks: WatchmanClocks): Promise<FileCrawlData> {
+  private _crawl(clocks: WatchmanClocks, customCrawler?: Config.Path): Promise<FileCrawlData> {
     const options = this._options;
     const ignore = this._ignore.bind(this);
-    const crawl =
-      canUseWatchman && this._options.useWatchman ? watchmanCrawl : nodeCrawl;
+    let crawl = canUseWatchman && this._options.useWatchman ? watchmanCrawl : nodeCrawl;
+    
+    if (customCrawler) {
+      try {
+        const rawCustomCrawler: (
+          options: CrawlerOptions,
+        ) => Promise<FileCrawlData> = require(customCrawler);
+
+        crawl = rawCustomCrawler;
+      } catch (e) {
+        throw new Error(`Could not use custom crawler: ${e.message}`);
+      }
+    }
+
     const crawlerOptions: CrawlerOptions = {
       computeSha1: options.computeSha1,
       clocks,

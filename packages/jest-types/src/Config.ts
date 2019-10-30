@@ -47,6 +47,7 @@ export type DefaultOptions = {
       }
     | null
     | undefined;
+  customCrawler: Path | null | undefined;
   dependencyExtractor: string | null | undefined;
   errorOnDeprecated: boolean;
   expand: boolean;
@@ -137,6 +138,7 @@ export type InitialOptions = {
       [key: string]: number;
     };
   };
+  customCrawler?: Path;
   dependencyExtractor?: string;
   detectLeaks?: boolean;
   detectOpenHandles?: boolean;
@@ -307,6 +309,7 @@ export type GlobalConfig = {
   coveragePathIgnorePatterns?: Array<string>;
   coverageReporters: Array<keyof ReportOptions>;
   coverageThreshold: CoverageThreshold;
+  customCrawler: Path | null | undefined;
   detectLeaks: boolean;
   detectOpenHandles: boolean;
   enabledTestsMap:
@@ -376,6 +379,7 @@ export type ProjectConfig = {
   cacheDirectory: Path;
   clearMocks: boolean;
   coveragePathIgnorePatterns: Array<string>;
+  customCrawler: Path | null | undefined;
   cwd: Path;
   dependencyExtractor?: string;
   detectLeaks: boolean;

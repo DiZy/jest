@@ -37,6 +37,7 @@ const initialOptions: Config.InitialOptions = {
       statements: 100,
     },
   },
+  customCrawler: '<rootDir>/customCrawler.js',
   dependencyExtractor: '<rootDir>/dependencyExtractor.js',
   displayName: multipleValidOptions('test-config', {
     color: 'blue',
