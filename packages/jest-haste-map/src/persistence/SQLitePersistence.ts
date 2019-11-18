@@ -21,8 +21,8 @@ const regexps: Map<string, RegExp> = new Map();
 class SQLitePersistence implements Persistence {
   regexMatch(filePath: string, pattern: string): number {
     let insensitivePattern = regexps.get(pattern);
-    if(!insensitivePattern) {
-      insensitivePattern =  new RegExp(pattern, 'i');
+    if (!insensitivePattern) {
+      insensitivePattern = new RegExp(pattern, 'i');
       regexps.set(pattern, insensitivePattern);
     }
 
@@ -33,8 +33,10 @@ class SQLitePersistence implements Persistence {
     }
   }
 
-  findFilePathsBasedOnPattern(cachePath: string, pattern: string): Array<string> {
-
+  findFilePathsBasedOnPattern(
+    cachePath: string,
+    pattern: string,
+  ): Array<string> {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath);
 
@@ -55,7 +57,10 @@ class SQLitePersistence implements Persistence {
     return filesArr.map(file => file.filePath);
   }
 
-  createFilePersistenceData(cachePath: string, fileCrawlData: FileCrawlData): FilePersistenceData {
+  createFilePersistenceData(
+    cachePath: string,
+    fileCrawlData: FileCrawlData,
+  ): FilePersistenceData {
     const {changedFiles, removedFiles, isFresh} = fileCrawlData;
 
     const filePersistenceData = {
@@ -64,26 +69,37 @@ class SQLitePersistence implements Persistence {
       changedFiles: new Map<string, FileMetaData>(),
     };
 
-    if(isFresh) {
-      for(const [changedFilePath, changedFile] of changedFiles) {
+    if (isFresh) {
+      for (const [changedFilePath, changedFile] of changedFiles) {
         const newFileMetadata: FileMetaData = [
           '',
           changedFile.mtime,
           changedFile.size,
           0,
           '',
-          changedFile.sha1,         
+          changedFile.sha1,
         ];
         filePersistenceData.changedFiles.set(changedFilePath, newFileMetadata);
       }
-    }
-    else {
-      for(const [changedFilePath, changedFile] of changedFiles) {
-        const existingFiledata = this.getFileMetadata(cachePath, changedFilePath);
-        if(existingFiledata && existingFiledata[H.MTIME] == changedFile.mtime) {
-          filePersistenceData.changedFiles.set(changedFilePath, existingFiledata);
-        } else if (existingFiledata && changedFile.sha1 &&
-          existingFiledata[H.SHA1] === changedFile.sha1) {
+    } else {
+      for (const [changedFilePath, changedFile] of changedFiles) {
+        const existingFiledata = this.getFileMetadata(
+          cachePath,
+          changedFilePath,
+        );
+        if (
+          existingFiledata &&
+          existingFiledata[H.MTIME] == changedFile.mtime
+        ) {
+          filePersistenceData.changedFiles.set(
+            changedFilePath,
+            existingFiledata,
+          );
+        } else if (
+          existingFiledata &&
+          changedFile.sha1 &&
+          existingFiledata[H.SHA1] === changedFile.sha1
+        ) {
           const updatedFileMetadata: FileMetaData = [
             existingFiledata[H.ID],
             changedFile.mtime,
@@ -92,9 +108,11 @@ class SQLitePersistence implements Persistence {
             existingFiledata[H.DEPENDENCIES],
             changedFile.sha1,
           ];
-          filePersistenceData.changedFiles.set(changedFilePath, updatedFileMetadata);
-        }
-        else {
+          filePersistenceData.changedFiles.set(
+            changedFilePath,
+            updatedFileMetadata,
+          );
+        } else {
           const newFileMetadata: FileMetaData = [
             '',
             changedFile.mtime,
@@ -102,16 +120,21 @@ class SQLitePersistence implements Persistence {
             0,
             '',
             changedFile.sha1,
-            
           ];
-          filePersistenceData.changedFiles.set(changedFilePath, newFileMetadata);
+          filePersistenceData.changedFiles.set(
+            changedFilePath,
+            newFileMetadata,
+          );
         }
       }
     }
     return filePersistenceData;
   }
-  
-  getFileMetadata(cachePath:string, filePath: string): FileMetaData | undefined {
+
+  getFileMetadata(
+    cachePath: string,
+    filePath: string,
+  ): FileMetaData | undefined {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath);
 
@@ -122,35 +145,93 @@ class SQLitePersistence implements Persistence {
       mtime: number;
       size: number;
       visited: 0 | 1;
-      dependencies: string;
       sha1: string;
     } = db.prepare(`SELECT * FROM files WHERE filePath = ?`).get(filePath);
 
-    if(!file) {
+    const depsStr = this.getDependencies(cachePath, filePath).join(
+      H.DEPENDENCY_DELIM,
+    );
+
+    if (!file) {
       return undefined;
     }
 
-    return [file.id, file.mtime, file.size, file.visited, file.dependencies, file.sha1];
+    return [file.id, file.mtime, file.size, file.visited, depsStr, file.sha1];
   }
 
-  setFileMetadata(cachePath:string, filePath: string, fileMetadata: FileMetaData) {
+  getDependencies(cachePath: string, filePath: string): Array<string> {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath);
-    
-    // Upsert changedFiles
-    const upsertFileStmt = db.prepare(
-      `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
-    
-    upsertFileStmt.run(
-      filePath,
-      fileMetadata[H.ID],
-      fileMetadata[H.MTIME],
-      fileMetadata[H.SIZE],
-      fileMetadata[H.VISITED],
-      fileMetadata[H.DEPENDENCIES],
-      fileMetadata[H.SHA1],
-    );
+
+    const dependencies: Array<{
+      name: string;
+    }> = db
+      .prepare(`SELECT name FROM dependencies WHERE filePath = ?`)
+      .all(filePath);
+
+    return dependencies.map(dep => dep.name);
+  }
+
+  getFileMetadataWithoutDependencies(
+    cachePath: string,
+    filePath: string,
+  ): FileMetaData | undefined {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath);
+
+    // Fetch files.
+    const file: {
+      filePath: string;
+      id: string;
+      mtime: number;
+      size: number;
+      visited: 0 | 1;
+      sha1: string;
+    } = db.prepare(`SELECT * FROM files WHERE filePath = ?`).get(filePath);
+
+    console.error(file);
+
+    if (!file) {
+      return undefined;
+    }
+
+    return [file.id, file.mtime, file.size, file.visited, '', file.sha1];
+  }
+
+  setFileMetadata(
+    cachePath: string,
+    filePath: string,
+    fileMetadata: FileMetaData,
+  ) {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath);
+
+    db.transaction(() => {
+      // Upsert changedFiles
+      const upsertFileStmt = db.prepare(
+        `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, sha1) VALUES (?, ?, ?, ?, ?, ?)`,
+      );
+
+      upsertFileStmt.run(
+        filePath,
+        fileMetadata[H.ID],
+        fileMetadata[H.MTIME],
+        fileMetadata[H.SIZE],
+        fileMetadata[H.VISITED],
+        fileMetadata[H.SHA1],
+      );
+
+      const deps = fileMetadata[H.DEPENDENCIES].split(H.DEPENDENCY_DELIM);
+
+      db.prepare(`DELETE FROM dependencies WHERE filePath = ?`).run(filePath);
+
+      const upsertDepsStmt = db.prepare(
+        `INSERT INTO dependencies (filePath, name) VALUES (?, ?)`,
+      );
+      for (const dep of deps) {
+        upsertDepsStmt.run(filePath, dep);
+      }
+    })();
   }
 
   deleteFileMetadata(cachePath: string, filePath: string) {
@@ -172,18 +253,20 @@ class SQLitePersistence implements Persistence {
       mtime: number;
       size: number;
       visited: 0 | 1;
-      dependencies: string;
       sha1: string;
     }> = db.prepare(`SELECT * FROM files`).all();
 
     const fileMap = new Map<string, FileMetaData>();
     for (const file of filesArr) {
+      const deps = this.getDependencies(cachePath, file.filePath).join(
+        H.DEPENDENCY_DELIM,
+      );
       fileMap.set(file.filePath, [
         file.id,
         file.mtime,
         file.size,
         file.visited,
-        file.dependencies,
+        deps,
         file.sha1,
       ]);
     }
@@ -252,9 +335,13 @@ class SQLitePersistence implements Persistence {
     return internalHasteMap;
   }
 
-  persist(cachePath: string, moduleMapData: SQLiteCache, filePersistenceData?: FilePersistenceData) {
+  persist(
+    cachePath: string,
+    moduleMapData: SQLiteCache,
+    filePersistenceData?: FilePersistenceData,
+  ) {
     const db = this.getDatabase(cachePath);
-    
+
     db.transaction(() => {
       if (filePersistenceData) {
         const {changedFiles, removedFiles, isFresh} = filePersistenceData;
@@ -270,16 +357,17 @@ class SQLitePersistence implements Persistence {
             file[H.MTIME],
             file[H.SIZE],
             file[H.VISITED],
-            file[H.DEPENDENCIES],
             file[H.SHA1],
           );
         };
-        
+
         // Remove files as necessary
         if (isFresh) {
           db.exec('DELETE FROM files');
         } else {
-          const removeFileStmt = db.prepare(`DELETE FROM files WHERE filePath=?`);
+          const removeFileStmt = db.prepare(
+            `DELETE FROM files WHERE filePath=?`,
+          );
           for (const filePath of removedFiles) {
             removeFileStmt.run(filePath);
           }
@@ -287,14 +375,29 @@ class SQLitePersistence implements Persistence {
 
         // Upsert changedFiles
         const upsertFileStmt = db.prepare(
-          `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, dependencies, sha1) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT OR REPLACE INTO files (filePath, id, mtime, size, visited, sha1) VALUES (?, ?, ?, ?, ?, ?)`,
+        );
+        const deleteDepsStmt = db.prepare(
+          `DELETE FROM dependencies WHERE filePath = ?`,
+        );
+        const upsertDepsStmt = db.prepare(
+          `INSERT OR REPLACE INTO dependencies (filePath, name) VALUES (?, ?)`,
         );
         for (const file of changedFiles) {
           runFileStmt(upsertFileStmt, file);
+
+          const [filePath, fileMetadata] = file;
+
+          deleteDepsStmt.run(filePath);
+
+          const deps = fileMetadata[H.DEPENDENCIES].split(H.DEPENDENCY_DELIM);
+          for (const dep of deps) {
+            upsertDepsStmt.run(filePath, dep);
+          }
         }
       }
 
-      if(moduleMapData.mocksAreCleared) {
+      if (moduleMapData.mocksAreCleared) {
         // Remove all mocks
         db.exec('DELETE FROM mocks');
       } else {
@@ -303,16 +406,16 @@ class SQLitePersistence implements Persistence {
           db.prepare('DELETE FROM mocks where name = ?').run(name);
         }
       }
-  
-      if(moduleMapData.mapIsCleared) {
+
+      if (moduleMapData.mapIsCleared) {
         // Remove all map
         db.exec('DELETE FROM map');
       } else {
         // Remove all removedModules
         for (const [name, platforms] of moduleMapData.removedModules) {
-          if(platforms instanceof Set) {
+          if (platforms instanceof Set) {
             const moduleItem = this.getFromModuleMap(cachePath, name);
-            if(!moduleItem) {
+            if (!moduleItem) {
               continue;
             }
 
@@ -320,7 +423,7 @@ class SQLitePersistence implements Persistence {
               delete moduleItem[platform];
             }
 
-            if(Object.keys(moduleItem).length === 0) {
+            if (Object.keys(moduleItem).length === 0) {
               // Delete if empty
               db.prepare('DELETE FROM map WHERE name = ?').run(name);
             } else if (moduleItem) {
@@ -328,27 +431,26 @@ class SQLitePersistence implements Persistence {
                 stmt: betterSqlLite3.Statement,
                 [name, mapItem]: [string, ModuleMapItem],
               ) => {
-                const params = [name,
-                  ...mapItem[H.GENERIC_PLATFORM] || [null, null],
-                  ...mapItem[H.NATIVE_PLATFORM] || [null, null],
-                  ...mapItem[H.IOS_PLATFORM] || [null, null],
-                  ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
-                stmt.run(
-                  params
-                );
+                const params = [
+                  name,
+                  ...(mapItem[H.GENERIC_PLATFORM] || [null, null]),
+                  ...(mapItem[H.NATIVE_PLATFORM] || [null, null]),
+                  ...(mapItem[H.IOS_PLATFORM] || [null, null]),
+                  ...(mapItem[H.ANDROID_PLATFORM] || [null, null]),
+                ];
+                stmt.run(params);
               };
               const upsertMapStmt = db.prepare(
                 `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               );
               runMapStmt(upsertMapStmt, [name, moduleItem]);
             }
-          }
-          else {
+          } else {
             db.prepare('DELETE FROM map where name = ?').run(name);
           }
         }
       }
-  
+
       // Insert or replace changed mocks
       for (const [name, filePath] of moduleMapData.mocks) {
         const insertMock = db.prepare(
@@ -356,20 +458,20 @@ class SQLitePersistence implements Persistence {
         );
         insertMock.run(name, filePath);
       }
-  
+
       // Insert or replace changed modules
       const runMapStmt = (
         stmt: betterSqlLite3.Statement,
         [name, mapItem]: [string, ModuleMapItem],
       ) => {
-        const params = [name,
-          ...mapItem[H.GENERIC_PLATFORM] || [null, null],
-          ...mapItem[H.NATIVE_PLATFORM] || [null, null],
-          ...mapItem[H.IOS_PLATFORM] || [null, null],
-          ...mapItem[H.ANDROID_PLATFORM] || [null, null],];
-        stmt.run(
-          params
-        );
+        const params = [
+          name,
+          ...(mapItem[H.GENERIC_PLATFORM] || [null, null]),
+          ...(mapItem[H.NATIVE_PLATFORM] || [null, null]),
+          ...(mapItem[H.IOS_PLATFORM] || [null, null]),
+          ...(mapItem[H.ANDROID_PLATFORM] || [null, null]),
+        ];
+        stmt.run(params);
       };
       const upsertMapStmt = db.prepare(
         `INSERT OR REPLACE INTO map (name, genericPath, genericType, nativePath, nativeType, iosPath, iosType, androidPath, androidType) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -377,7 +479,7 @@ class SQLitePersistence implements Persistence {
       for (const [name, moduleItem] of moduleMapData.map) {
         runMapStmt(upsertMapStmt, [name, moduleItem]);
       }
-  
+
       // Replace all duplicates
       db.exec('DELETE FROM duplicates');
       const insertDuplicateStmt = db.prepare(
@@ -417,10 +519,12 @@ class SQLitePersistence implements Persistence {
   getMock(cachePath: string, name: string): string | undefined {
     const db = this.getDatabase(cachePath);
     // Fetch mocks.
-    const mock: {
-      name: string;
-      filePath: string;
-    } | undefined = db.prepare(`SELECT * FROM mocks where name = ?`).get(name);
+    const mock:
+      | {
+          name: string;
+          filePath: string;
+        }
+      | undefined = db.prepare(`SELECT * FROM mocks where name = ?`).get(name);
 
     return mock ? mock.filePath : undefined;
   }
@@ -428,19 +532,21 @@ class SQLitePersistence implements Persistence {
   getFromModuleMap(cachePath: string, name: string): ModuleMapItem | undefined {
     const db = this.getDatabase(cachePath);
     // Fetch map.
-    const map: {
-      name: string;
-      genericPath: string | null;
-      genericType: number | null;
-      nativePath: string | null;
-      nativeType: number | null;
-      iosPath: string | null;
-      iosType: number | null;
-      androidPath: string | null;
-      androidType: number | null;
-    } | undefined = db.prepare(`SELECT * FROM map WHERE name = ?`).get(name);
+    const map:
+      | {
+          name: string;
+          genericPath: string | null;
+          genericType: number | null;
+          nativePath: string | null;
+          nativeType: number | null;
+          iosPath: string | null;
+          iosType: number | null;
+          androidPath: string | null;
+          androidType: number | null;
+        }
+      | undefined = db.prepare(`SELECT * FROM map WHERE name = ?`).get(name);
 
-    if(!map) {
+    if (!map) {
       return undefined;
     }
 
@@ -463,7 +569,7 @@ class SQLitePersistence implements Persistence {
 
   getAllDuplicates(cachePath: string) {
     const db = this.getDatabase(cachePath);
-    const duplicates : DuplicatesIndex = new Map();
+    const duplicates: DuplicatesIndex = new Map();
 
     // Fetch duplicates.
     const duplicatesArr: Array<{
@@ -489,7 +595,7 @@ class SQLitePersistence implements Persistence {
     openDatabases.delete(cachePath);
   }
 
-  private getDatabase(cachePath: string): betterSqlLite3.Database{
+  private getDatabase(cachePath: string): betterSqlLite3.Database {
     let db = openDatabases.get(cachePath);
     if (db) {
       return db;
@@ -504,7 +610,6 @@ class SQLitePersistence implements Persistence {
         mtime integer NOT NULL,
         size integer NOT NULL,
         visited integer NOT NULL,
-        dependencies text NOT NULL,
         sha1 text
       );`);
     } catch {
@@ -517,10 +622,15 @@ class SQLitePersistence implements Persistence {
         mtime integer NOT NULL,
         size integer NOT NULL,
         visited integer NOT NULL,
-        dependencies text NOT NULL,
         sha1 text
       );`);
     }
+
+    db.exec(`CREATE TABLE IF NOT EXISTS dependencies(
+      id text PRIMARY KEY,
+      name text NOT NULL,
+      filePath text NOT NULL
+    );`);
 
     db.exec(`CREATE TABLE IF NOT EXISTS map(
       name text NOT NULL PRIMARY KEY,

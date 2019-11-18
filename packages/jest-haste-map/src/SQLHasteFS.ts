@@ -8,7 +8,18 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileMetaData, FileCrawlData, FilePersistenceData, FileData, WatchmanClocks, DuplicatesIndex, ModuleMapItem, InternalHasteMap, SQLiteCache, DuplicatesSet} from './types';
+import {
+  FileMetaData,
+  FileCrawlData,
+  FilePersistenceData,
+  FileData,
+  WatchmanClocks,
+  DuplicatesIndex,
+  ModuleMapItem,
+  InternalHasteMap,
+  SQLiteCache,
+  DuplicatesSet,
+} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
@@ -20,10 +31,14 @@ export default class SQLHasteFS implements HasteFS {
   private readonly _cachePath: Config.Path;
   private _localCache: SQLiteCache;
 
-  constructor(rootDir: Config.Path, cachePath: Config.Path, resetCache?: boolean) {
+  constructor(
+    rootDir: Config.Path,
+    cachePath: Config.Path,
+    resetCache?: boolean,
+  ) {
     this._rootDir = rootDir;
     this._cachePath = cachePath;
-    if(resetCache) {
+    if (resetCache) {
       rimraf.sync(cachePath);
     }
     this._localCache = {
@@ -33,23 +48,30 @@ export default class SQLHasteFS implements HasteFS {
       mocks: new Map(),
       removedModules: new Map(),
       removedMocks: new Set(),
-      mocksAreCleared: false, 
+      mocksAreCleared: false,
       mapIsCleared: false,
-    }
+    };
   }
-  
+
   getFullInternalHasteMap(): InternalHasteMap {
     return SQLitePersistence.readInternalHasteMap(this._cachePath);
   }
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
-    return SQLitePersistence.createFilePersistenceData(this._cachePath, fileCrawlData);
+    return SQLitePersistence.createFilePersistenceData(
+      this._cachePath,
+      fileCrawlData,
+    );
   }
 
   persist(filePersistenceData?: FilePersistenceData): void {
-    SQLitePersistence.persist(this._cachePath, this._localCache, filePersistenceData);
+    SQLitePersistence.persist(
+      this._cachePath,
+      this._localCache,
+      filePersistenceData,
+    );
   }
-  
+
   getClocks(): WatchmanClocks {
     return this._localCache.clocks;
   }
@@ -76,27 +98,29 @@ export default class SQLHasteFS implements HasteFS {
 
   getFromModuleMap(moduleName: string): ModuleMapItem | undefined {
     const clearRemovedPlatforms = (moduleItem: ModuleMapItem | undefined) => {
-      if(!moduleItem) {
+      if (!moduleItem) {
         return undefined;
       }
       const removedPlatforms = this._localCache.removedModules.get(moduleName);
-      if(removedPlatforms === true) {
+      if (removedPlatforms === true) {
         return undefined;
-      } else if(removedPlatforms) {
-        for(const removedPlatform of removedPlatforms) {
+      } else if (removedPlatforms) {
+        for (const removedPlatform of removedPlatforms) {
           delete moduleItem[removedPlatform];
         }
       }
       return moduleItem;
-    }
+    };
 
     let moduleItem = this._localCache.map.get(moduleName);
-    
-    if(this._localCache.mapIsCleared) {
+
+    if (this._localCache.mapIsCleared) {
       return clearRemovedPlatforms(moduleItem);
     }
 
-    moduleItem = moduleItem || SQLitePersistence.getFromModuleMap(this._cachePath, moduleName);
+    moduleItem =
+      moduleItem ||
+      SQLitePersistence.getFromModuleMap(this._cachePath, moduleName);
     return clearRemovedPlatforms(moduleItem);
   }
 
@@ -106,24 +130,24 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   deleteFromModuleMap(moduleName: string, platform?: string | undefined): void {
-    if(platform) {
-      const currentRemovedPlatforms = this._localCache.removedModules.get(moduleName);
-      if(currentRemovedPlatforms instanceof Set) {
+    if (platform) {
+      const currentRemovedPlatforms = this._localCache.removedModules.get(
+        moduleName,
+      );
+      if (currentRemovedPlatforms instanceof Set) {
         currentRemovedPlatforms.add(platform);
-      }
-      else {
+      } else {
         this._localCache.removedModules.set(moduleName, new Set([platform]));
       }
 
       if (this._localCache.map.get(moduleName)) {
         delete this._localCache.map.get(moduleName)![platform];
 
-        if(Object.keys(this._localCache.map.get(moduleName)!).length === 0) {
+        if (Object.keys(this._localCache.map.get(moduleName)!).length === 0) {
           this._localCache.map.delete(moduleName);
         }
       }
-    }
-    else {
+    } else {
       // Remove all if platform is not specified
       this._localCache.removedModules.set(moduleName, true);
       this._localCache.map.delete(moduleName);
@@ -143,7 +167,7 @@ export default class SQLHasteFS implements HasteFS {
       return undefined;
     }
 
-    if(this._localCache.mocksAreCleared) {
+    if (this._localCache.mocksAreCleared) {
       return mock;
     }
 
@@ -167,34 +191,30 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   getModuleName(file: Config.Path): string | null {
-    const fileMetadata = this.getFileMetadata(file);
+    const fileMetadata = this._getFileMetadataWithoutDependencies(file);
     return (fileMetadata && fileMetadata[H.ID]) || null;
   }
 
   getSize(file: Config.Path): number | null {
-    const fileMetadata = this.getFileMetadata(file);
+    const fileMetadata = this._getFileMetadataWithoutDependencies(file);
     return (fileMetadata && fileMetadata[H.SIZE]) || null;
   }
 
   getDependencies(file: Config.Path): Array<string> | null {
-    const fileMetadata = this.getFileMetadata(file);
-
-    if (fileMetadata) {
-      return fileMetadata[H.DEPENDENCIES]
-        ? fileMetadata[H.DEPENDENCIES].split(H.DEPENDENCY_DELIM)
-        : [];
+    if (this.exists(file)) {
+      return SQLitePersistence.getDependencies(this._cachePath, file);
     } else {
       return null;
     }
   }
 
   getSha1(file: Config.Path): string | null {
-    const fileMetadata = this.getFileMetadata(file);
+    const fileMetadata = this._getFileMetadataWithoutDependencies(file);
     return (fileMetadata && fileMetadata[H.SHA1]) || null;
   }
 
   exists(file: Config.Path): boolean {
-    return this.getFileMetadata(file) != null;
+    return this._getFileMetadataWithoutDependencies(file) != null;
   }
 
   getAllFilesMap(): FileData {
@@ -216,7 +236,10 @@ export default class SQLHasteFS implements HasteFS {
   }
 
   matchFilesBasedOnRelativePath(pattern: RegExp | string): Array<Config.Path> {
-    const files = SQLitePersistence.findFilePathsBasedOnPattern(this._cachePath, pattern.toString());
+    const files = SQLitePersistence.findFilePathsBasedOnPattern(
+      this._cachePath,
+      pattern.toString(),
+    );
     return files.map(file => fastPath.resolve(this._rootDir, file));
   }
 
@@ -255,7 +278,11 @@ export default class SQLHasteFS implements HasteFS {
 
   setFileMetadata(filePath: Config.Path, fileMetadata: FileMetaData): void {
     const relativePath = this._convertToRelativePath(filePath);
-    return SQLitePersistence.setFileMetadata(this._cachePath, relativePath, fileMetadata);
+    return SQLitePersistence.setFileMetadata(
+      this._cachePath,
+      relativePath,
+      fileMetadata,
+    );
   }
 
   deleteFileMetadata(file: Config.Path): void {
@@ -269,5 +296,15 @@ export default class SQLHasteFS implements HasteFS {
 
   private _convertToRelativePath(file: Config.Path): Config.Path {
     return fastPath.relative(this._rootDir, file);
+  }
+
+  private _getFileMetadataWithoutDependencies(
+    file: Config.Path,
+  ): FileMetaData | undefined {
+    const relativePath = this._convertToRelativePath(file);
+    return SQLitePersistence.getFileMetadataWithoutDependencies(
+      this._cachePath,
+      relativePath,
+    );
   }
 }
