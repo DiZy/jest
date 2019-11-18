@@ -14,6 +14,8 @@ import {
 } from '../types';
 import H from '../constants';
 import rimraf = require('rimraf');
+import getMockName from '../getMockName';
+import {Config} from '@jest/types';
 
 const openDatabases: Map<string, betterSqlLite3.Database> = new Map();
 const regexps: Map<string, RegExp> = new Map();
@@ -188,8 +190,6 @@ class SQLitePersistence implements Persistence {
       visited: 0 | 1;
       sha1: string;
     } = db.prepare(`SELECT * FROM files WHERE filePath = ?`).get(filePath);
-
-    console.error(file);
 
     if (!file) {
       return undefined;
@@ -583,6 +583,46 @@ class SQLitePersistence implements Persistence {
     }
 
     return duplicates;
+  }
+
+  getFilesWithDependencies(
+    cachePath: string,
+    files: Array<string>,
+  ): Array<Config.Path> {
+    const db = this.getDatabase(cachePath);
+    const fileData: FileData = new Map();
+    files.forEach(file => {
+      console.log(file);
+      const meta = this.getFileMetadataWithoutDependencies(cachePath, file);
+      if (meta) {
+        console.log(meta);
+        fileData.set(file, meta);
+      }
+    });
+
+    const results: Set<string> = new Set();
+
+    const getFilesWithDepStmt = db.prepare(
+      `SELECT filePath FROM dependencies WHERE name = ?`,
+    );
+
+    for (const [filePath, fileMetadata] of fileData) {
+      let moduleName: string | undefined;
+      if (fileMetadata[H.MODULE] !== '') {
+        moduleName = fileMetadata[H.MODULE];
+      } else {
+        try {
+          moduleName = getMockName(filePath);
+        } catch {}
+      }
+      console.log(moduleName);
+      if (moduleName) {
+        const files: Array<string> = getFilesWithDepStmt.all(moduleName);
+        files.forEach(file => results.add(file));
+      }
+    }
+
+    return Array.from(results);
   }
 
   private closeDatabase(cachePath: string): void {

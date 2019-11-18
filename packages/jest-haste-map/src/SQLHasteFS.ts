@@ -202,7 +202,8 @@ export default class SQLHasteFS implements HasteFS {
 
   getDependencies(file: Config.Path): Array<string> | null {
     if (this.exists(file)) {
-      return SQLitePersistence.getDependencies(this._cachePath, file);
+      const relativePath = this._convertToRelativePath(file);
+      return SQLitePersistence.getDependencies(this._cachePath, relativePath);
     } else {
       return null;
     }
@@ -292,6 +293,15 @@ export default class SQLHasteFS implements HasteFS {
 
   copyHasteMap(): void {
     // No need to copy locally because it is stored in SQL
+  }
+
+  getAbsolutePathsOfFilesWithDependencies(files: Array<Config.Path>) {
+    files = files.map(file => fastPath.relative(this._rootDir, file));
+    const results = SQLitePersistence.getFilesWithDependencies(
+      this._cachePath,
+      files,
+    );
+    return results.map(result => fastPath.resolve(this._rootDir, result));
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {

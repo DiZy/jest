@@ -134,12 +134,16 @@ export default class SearchSource {
     return data;
   }
 
-  private _getAllTestPaths(useSQLite: boolean, testPathPattern?: string): SearchResult {
+  private _getAllTestPaths(
+    useSQLite: boolean,
+    testPathPattern?: string,
+  ): SearchResult {
     let files;
-    if(useSQLite && testPathPattern) {
-      files = this._context.hasteFS.matchFilesBasedOnRelativePath(testPathPattern);
-    }
-    else {
+    if (useSQLite && testPathPattern) {
+      files = this._context.hasteFS.matchFilesBasedOnRelativePath(
+        testPathPattern,
+      );
+    } else {
       files = this._context.hasteFS.getAllFiles();
     }
     return this._filterTestPathsWithStats(
@@ -152,13 +156,17 @@ export default class SearchSource {
     return this._testPathCases.every(testCase => testCase.isMatch(path));
   }
 
-  findMatchingTests(useSQLite: boolean, testPathPattern?: string): SearchResult {
+  findMatchingTests(
+    useSQLite: boolean,
+    testPathPattern?: string,
+  ): SearchResult {
     return this._getAllTestPaths(useSQLite, testPathPattern);
   }
 
   findRelatedTests(
     allPaths: Set<Config.Path>,
     collectCoverage: boolean,
+    useSQLite: boolean,
   ): SearchResult {
     const dependencyResolver = new DependencyResolver(
       this._context.resolver,
@@ -174,6 +182,7 @@ export default class SearchSource {
             allPaths,
             this.isTestFilePath.bind(this),
             {skipNodeResolution: this._context.config.skipNodeResolution},
+            useSQLite,
           ),
         ),
       };
@@ -231,12 +240,17 @@ export default class SearchSource {
   findRelatedTestsFromPattern(
     paths: Array<Config.Path>,
     collectCoverage: boolean,
+    useSQLite: boolean,
   ): SearchResult {
     if (Array.isArray(paths) && paths.length) {
       const resolvedPaths = paths.map(p =>
         path.resolve(this._context.config.cwd, p),
       );
-      return this.findRelatedTests(new Set(resolvedPaths), collectCoverage);
+      return this.findRelatedTests(
+        new Set(resolvedPaths),
+        collectCoverage,
+        useSQLite,
+      );
     }
     return {tests: []};
   }
@@ -244,6 +258,7 @@ export default class SearchSource {
   findTestRelatedToChangedFiles(
     changedFilesInfo: ChangedFiles,
     collectCoverage: boolean,
+    useSQLite: boolean,
   ) {
     const {repos, changedFiles} = changedFilesInfo;
     // no SCM (git/hg/...) is found in any of the roots.
@@ -252,7 +267,7 @@ export default class SearchSource {
     >).every(scm => repos[scm].size === 0);
     return noSCM
       ? {noSCM: true, tests: []}
-      : this.findRelatedTests(changedFiles, collectCoverage);
+      : this.findRelatedTests(changedFiles, collectCoverage, useSQLite);
   }
 
   private _getTestPaths(
@@ -269,6 +284,7 @@ export default class SearchSource {
       return this.findTestRelatedToChangedFiles(
         changedFiles,
         globalConfig.collectCoverage,
+        globalConfig.useSQLite,
       );
     } else if (globalConfig.runTestsByPath && paths && paths.length) {
       return this.findTestsByPaths(paths);
@@ -276,9 +292,13 @@ export default class SearchSource {
       return this.findRelatedTestsFromPattern(
         paths,
         globalConfig.collectCoverage,
+        globalConfig.useSQLite,
       );
     } else if (globalConfig.testPathPattern != null) {
-      return this.findMatchingTests(globalConfig.useSQLite, globalConfig.testPathPattern);
+      return this.findMatchingTests(
+        globalConfig.useSQLite,
+        globalConfig.testPathPattern,
+      );
     } else {
       return {tests: []};
     }

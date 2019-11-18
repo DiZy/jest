@@ -8,7 +8,17 @@
 import micromatch = require('micromatch');
 import {replacePathSepForGlob} from 'jest-util';
 import {Config} from '@jest/types';
-import {FileData, FileMetaData, FileCrawlData, FilePersistenceData, InternalHasteMap, WatchmanClocks, DuplicatesIndex, ModuleMapItem, DuplicatesSet} from './types';
+import {
+  FileData,
+  FileMetaData,
+  FileCrawlData,
+  FilePersistenceData,
+  InternalHasteMap,
+  WatchmanClocks,
+  DuplicatesIndex,
+  ModuleMapItem,
+  DuplicatesSet,
+} from './types';
 import * as fastPath from './lib/fast_path';
 import H from './constants';
 import HasteFS from './HasteFS';
@@ -19,7 +29,15 @@ export default class DefaultHasteFS implements HasteFS {
   private _hasteMap: InternalHasteMap;
   private readonly _cachePath: Config.Path;
 
-  constructor({rootDir, initialHasteMap, cachePath}: {rootDir: Config.Path; initialHasteMap: InternalHasteMap; cachePath: Config.Path}) {
+  constructor({
+    rootDir,
+    initialHasteMap,
+    cachePath,
+  }: {
+    rootDir: Config.Path;
+    initialHasteMap: InternalHasteMap;
+    cachePath: Config.Path;
+  }) {
     this._rootDir = rootDir;
     this._hasteMap = initialHasteMap;
     this._cachePath = cachePath;
@@ -41,10 +59,10 @@ export default class DefaultHasteFS implements HasteFS {
     return this._hasteMap.duplicates;
   }
 
-  getDuplicate(name: string): Map<string, DuplicatesSet> | undefined{
+  getDuplicate(name: string): Map<string, DuplicatesSet> | undefined {
     return this._hasteMap.duplicates.get(name);
   }
-  
+
   setDuplicate(name: string, duplicate: Map<string, DuplicatesSet>): void {
     this._hasteMap.duplicates.set(name, duplicate);
   }
@@ -62,16 +80,15 @@ export default class DefaultHasteFS implements HasteFS {
   }
 
   deleteFromModuleMap(moduleName: string, platform?: string): void {
-    if(platform) {
+    if (platform) {
       if (this._hasteMap.map.get(moduleName)) {
         delete this._hasteMap.map.get(moduleName)![platform];
-        
-        if(Object.keys(this._hasteMap.map.get(moduleName)!).length === 0) {
+
+        if (Object.keys(this._hasteMap.map.get(moduleName)!).length === 0) {
           this._hasteMap.map.delete(moduleName);
         }
       }
-    }
-    else {
+    } else {
       this._hasteMap.map.delete(moduleName);
     }
   }
@@ -80,7 +97,7 @@ export default class DefaultHasteFS implements HasteFS {
     this._hasteMap.mocks.delete(mockName);
   }
 
-  getMock(mockPath: string): string | undefined{
+  getMock(mockPath: string): string | undefined {
     return this._hasteMap.mocks.get(mockPath);
   }
 
@@ -97,7 +114,11 @@ export default class DefaultHasteFS implements HasteFS {
   }
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData {
-    return FilePersistence.createFilePersistenceData(this._cachePath, fileCrawlData, this._hasteMap.files);
+    return FilePersistence.createFilePersistenceData(
+      this._cachePath,
+      fileCrawlData,
+      this._hasteMap.files,
+    );
   }
 
   persist(filePersistenceData?: FilePersistenceData): void {
@@ -105,7 +126,9 @@ export default class DefaultHasteFS implements HasteFS {
       try {
         this._hasteMap.files = filePersistenceData.finalFiles!;
       } catch {
-        throw new Error("FilePersistence updateFileData was called without finalFiles");
+        throw new Error(
+          'FilePersistence updateFileData was called without finalFiles',
+        );
       }
     }
     FilePersistence.persist(this._cachePath, this._hasteMap);
@@ -224,6 +247,13 @@ export default class DefaultHasteFS implements HasteFS {
       map: new Map(this._hasteMap.map),
       mocks: new Map(this._hasteMap.mocks),
     };
+  }
+
+  getAbsolutePathsOfFilesWithDependencies(_files: Array<Config.Path>) {
+    throw new Error(
+      'getFilesWithDependencies: Method not supported for DefaultHasteFS',
+    );
+    return [];
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {

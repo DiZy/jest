@@ -74,6 +74,7 @@ class DependencyResolver {
     paths: Set<Config.Path>,
     filter: (file: Config.Path) => boolean,
     options?: Resolver.ResolveModuleConfig,
+    useSQLite?: boolean,
   ): Array<DependencyResolver.ResolvedModule> {
     if (!paths.size) {
       return [];
@@ -125,22 +126,45 @@ class DependencyResolver {
         }
       }
     }
-    const modules: Array<DependencyResolver.ResolvedModule> = [];
-    for (const file of this._hasteFS.getAbsoluteFileIterator()) {
-      modules.push({
-        dependencies: this.resolve(file, options),
-        file,
-      });
+
+    if (useSQLite) {
+      const relevantPaths = this._hasteFS.getAbsolutePathsOfFilesWithDependencies(
+        Array.from(changed),
+      );
+      const results: Array<DependencyResolver.ResolvedModule> = new Array();
+
+      for (const path of relevantPaths) {
+        if (filter(path)) {
+          relatedPaths.delete(path);
+          results.push({
+            dependencies: this.resolve(path, options),
+            file: path,
+          });
+        }
+      }
+
+      return results.concat(
+        Array.from(relatedPaths).map(file => ({dependencies: [], file})),
+      );
+    } else {
+      const modules: Array<DependencyResolver.ResolvedModule> = [];
+      for (const file of this._hasteFS.getAbsoluteFileIterator()) {
+        modules.push({
+          dependencies: this.resolve(file, options),
+          file,
+        });
+      }
+      return collectModules(relatedPaths, modules, changed);
     }
-    return collectModules(relatedPaths, modules, changed);
   }
 
   resolveInverse(
     paths: Set<Config.Path>,
     filter: (file: Config.Path) => boolean,
     options?: Resolver.ResolveModuleConfig,
+    useSQLite?: boolean,
   ): Array<Config.Path> {
-    return this.resolveInverseModuleMap(paths, filter, options).map(
+    return this.resolveInverseModuleMap(paths, filter, options, useSQLite).map(
       module => module.file,
     );
   }

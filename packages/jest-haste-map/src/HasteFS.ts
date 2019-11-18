@@ -6,10 +6,19 @@
  */
 
 import {Config} from '@jest/types';
-import { FileMetaData, FileCrawlData, FilePersistenceData, FileData, WatchmanClocks, DuplicatesIndex, ModuleMapItem, InternalHasteMap, DuplicatesSet } from './types';
+import {
+  FileMetaData,
+  FileCrawlData,
+  FilePersistenceData,
+  FileData,
+  WatchmanClocks,
+  DuplicatesIndex,
+  ModuleMapItem,
+  InternalHasteMap,
+  DuplicatesSet,
+} from './types';
 
 export default interface HasteFS {
-
   getFullInternalHasteMap(): InternalHasteMap;
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData;
@@ -35,14 +44,16 @@ export default interface HasteFS {
   getFileIterator: () => Iterable<Config.Path>;
 
   getAbsoluteFileIterator: () => Iterable<Config.Path>;
-  
+
   setFileMetadata(filePath: string, fileMetadata: FileMetaData): void;
 
   deleteFileMetadata(filePath: string): void;
 
   matchFiles: (pattern: RegExp | string) => Array<Config.Path>;
 
-  matchFilesBasedOnRelativePath: (pattern: RegExp | string) => Array<Config.Path>;
+  matchFilesBasedOnRelativePath: (
+    pattern: RegExp | string,
+  ) => Array<Config.Path>;
 
   matchFilesWithGlob: (
     globs: Array<Config.Glob>,
@@ -78,4 +89,8 @@ export default interface HasteFS {
   clearMocks(): void;
 
   copyHasteMap(): void;
+
+  getAbsolutePathsOfFilesWithDependencies(
+    files: Array<Config.Path>,
+  ): Array<Config.Path>;
 }
