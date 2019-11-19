@@ -12,6 +12,7 @@ import {buildSnapshotResolver} from 'jest-snapshot';
 import {makeProjectConfig} from '../../../../TestUtils';
 
 import DependencyResolver from '../index';
+import rimraf = require('rimraf');
 
 const maxWorkers = 1;
 let dependencyResolver: DependencyResolver;
@@ -24,23 +25,30 @@ const cases: Record<string, jest.Mock> = {
 const filter = (path: Config.Path) =>
   Object.keys(cases).every(key => cases[key](path));
 
+const useSQLite = false;
+
 beforeEach(() => {
   Runtime = require('jest-runtime');
+  const cachePath = path.resolve(tmpdir(), 'jest-resolve-dependencies-test');
+  rimraf.sync(cachePath);
   config = makeProjectConfig({
-    cacheDirectory: path.resolve(tmpdir(), 'jest-resolve-dependencies-test'),
+    cacheDirectory: cachePath,
     moduleDirectories: ['node_modules'],
     rootDir: '.',
     roots: ['./packages/jest-resolve-dependencies'],
   });
-  return Runtime.createContext(config, {maxWorkers, watchman: false}).then(
-    (runtimeContext: any) => {
-      dependencyResolver = new DependencyResolver(
-        runtimeContext.resolver,
-        runtimeContext.hasteFS,
-        buildSnapshotResolver(config),
-      );
-    },
-  );
+  return Runtime.createContext(config, {
+    maxWorkers,
+    watchman: false,
+    useSQLite,
+    resetCache: true,
+  }).then((runtimeContext: any) => {
+    dependencyResolver = new DependencyResolver(
+      runtimeContext.resolver,
+      runtimeContext.hasteFS,
+      buildSnapshotResolver(config),
+    );
+  });
 });
 
 test('resolves no dependencies for non-existent path', () => {
@@ -69,19 +77,34 @@ test('resolves dependencies for scoped packages', () => {
 
 test('resolves no inverse dependencies for empty paths set', () => {
   const paths = new Set();
-  const resolved = dependencyResolver.resolveInverse(paths, filter);
+  const resolved = dependencyResolver.resolveInverse(
+    paths,
+    filter,
+    undefined,
+    useSQLite,
+  );
   expect(resolved.length).toEqual(0);
 });
 
 test('resolves no inverse dependencies for set of non-existent paths', () => {
   const paths = new Set(['/non/existent/path', '/another/one']);
-  const resolved = dependencyResolver.resolveInverse(paths, filter);
+  const resolved = dependencyResolver.resolveInverse(
+    paths,
+    filter,
+    undefined,
+    useSQLite,
+  );
   expect(resolved.length).toEqual(0);
 });
 
 test('resolves inverse dependencies for existing path', () => {
   const paths = new Set([path.resolve(__dirname, '__fixtures__/file.js')]);
-  const resolved = dependencyResolver.resolveInverse(paths, filter);
+  const resolved = dependencyResolver.resolveInverse(
+    paths,
+    filter,
+    undefined,
+    useSQLite,
+  );
   expect(resolved).toEqual([
     expect.stringContaining(
       path.join('__tests__', '__fixtures__', 'file.test.js'),
@@ -94,7 +117,12 @@ test('resolves inverse dependencies from available snapshot', () => {
     path.resolve(__dirname, '__fixtures__/file.js'),
     path.resolve(__dirname, '__fixtures__/__snapshots__/related.test.js.snap'),
   ]);
-  const resolved = dependencyResolver.resolveInverse(paths, filter);
+  const resolved = dependencyResolver.resolveInverse(
+    paths,
+    filter,
+    undefined,
+    useSQLite,
+  );
   expect(resolved).toEqual(
     expect.arrayContaining([
       expect.stringContaining(

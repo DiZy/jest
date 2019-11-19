@@ -64,9 +64,13 @@ export default class SQLHasteFS implements HasteFS {
     );
   }
 
-  persist(filePersistenceData?: FilePersistenceData): void {
+  persist(
+    config: Config.ProjectConfig,
+    filePersistenceData?: FilePersistenceData,
+  ): void {
     SQLitePersistence.persist(
       this._cachePath,
+      config,
       this._localCache,
       filePersistenceData,
     );
@@ -277,10 +281,15 @@ export default class SQLHasteFS implements HasteFS {
     return SQLitePersistence.getFileMetadata(this._cachePath, relativePath);
   }
 
-  setFileMetadata(filePath: Config.Path, fileMetadata: FileMetaData): void {
+  setFileMetadata(
+    config: Config.ProjectConfig,
+    filePath: Config.Path,
+    fileMetadata: FileMetaData,
+  ): void {
     const relativePath = this._convertToRelativePath(filePath);
     return SQLitePersistence.setFileMetadata(
       this._cachePath,
+      config,
       relativePath,
       fileMetadata,
     );
@@ -302,6 +311,16 @@ export default class SQLHasteFS implements HasteFS {
       files,
     );
     return results.map(result => fastPath.resolve(this._rootDir, result));
+  }
+
+  resolveFileDependency(file: Config.Path, dependency: string): Config.Path {
+    const relativePath = this._convertToRelativePath(file);
+    console.log(relativePath);
+    return SQLitePersistence.resolveFileDependency(
+      this._cachePath,
+      relativePath,
+      dependency,
+    );
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {

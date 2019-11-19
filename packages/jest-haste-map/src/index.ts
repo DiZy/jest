@@ -58,6 +58,7 @@ type Options = {
   cacheDirectory?: string;
   computeDependencies?: boolean;
   computeSha1?: boolean;
+  config: Config.ProjectConfig;
   console?: Console;
   dependencyExtractor?: string;
   extensions: Array<string>;
@@ -85,6 +86,7 @@ type InternalOptions = {
   cacheDirectory: string;
   computeDependencies: boolean;
   computeSha1: boolean;
+  config: Config.ProjectConfig;
   dependencyExtractor?: string;
   extensions: Array<string>;
   forceNodeFilesystemAPI: boolean;
@@ -258,6 +260,7 @@ class HasteMap extends EventEmitter {
           ? true
           : options.computeDependencies,
       computeSha1: options.computeSha1 || false,
+      config: options.config,
       dependencyExtractor: options.dependencyExtractor,
       extensions: options.extensions,
       forceNodeFilesystemAPI: !!options.forceNodeFilesystemAPI,
@@ -408,7 +411,7 @@ class HasteMap extends EventEmitter {
             hasteFS,
             fileCrawlData,
           );
-          hasteFS.persist(filePersistenceData);
+          hasteFS.persist(this._options.config, filePersistenceData);
         }
 
         const moduleMap = this.createHasteModuleMap(hasteFS);
@@ -476,7 +479,7 @@ class HasteMap extends EventEmitter {
     if (getPersistence(this._options.useSQLite).getType() === 'sqlite') {
       const SQLModuleMap = require('./SQLModuleMap').default;
       // Make sure it is persisted from hasteFS cache before returning
-      hasteFS.persist();
+      hasteFS.persist(this._options.config);
       return new SQLModuleMap(this._options.rootDir, this._cachePath);
     } else {
       const fullInternalHasteMap = hasteFS.getFullInternalHasteMap();
@@ -1069,9 +1072,17 @@ class HasteMap extends EventEmitter {
                     hasteFS.deleteFileMetadata(filePath);
                   } else {
                     if (value.updatedData) {
-                      hasteFS.setFileMetadata(filePath, value.updatedData);
+                      hasteFS.setFileMetadata(
+                        this._options.config,
+                        filePath,
+                        value.updatedData,
+                      );
                     } else {
-                      hasteFS.setFileMetadata(filePath, fileMetadata);
+                      hasteFS.setFileMetadata(
+                        this._options.config,
+                        filePath,
+                        fileMetadata,
+                      );
                     }
                   }
                   resolve();

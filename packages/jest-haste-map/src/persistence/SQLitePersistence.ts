@@ -16,6 +16,8 @@ import H from '../constants';
 import rimraf = require('rimraf');
 import getMockName from '../getMockName';
 import {Config} from '@jest/types';
+import HasteMap = require('..');
+const Runtime = require('jest-runtime');
 
 const openDatabases: Map<string, betterSqlLite3.Database> = new Map();
 const regexps: Map<string, RegExp> = new Map();
@@ -168,7 +170,7 @@ class SQLitePersistence implements Persistence {
     const dependencies: Array<{
       name: string;
     }> = db
-      .prepare(`SELECT name FROM dependencies WHERE filePath = ?`)
+      .prepare(`SELECT dependency FROM dependencies WHERE filePath = ?`)
       .all(filePath);
 
     return dependencies.map(dep => dep.name);
@@ -200,11 +202,19 @@ class SQLitePersistence implements Persistence {
 
   setFileMetadata(
     cachePath: string,
+    config: Config.ProjectConfig,
     filePath: string,
     fileMetadata: FileMetaData,
   ) {
     // Get database, throw if does not exist.
     const db = this.getDatabase(cachePath);
+
+    const SQLModuleMap = require('../SQLModuleMap').default;
+    const hasteModuleMap = (new SQLModuleMap(
+      config.rootDir,
+      cachePath,
+    ) as any) as HasteMap.ModuleMap;
+    const resolver = Runtime.createResolver(config, hasteModuleMap);
 
     db.transaction(() => {
       // Upsert changedFiles
@@ -226,10 +236,17 @@ class SQLitePersistence implements Persistence {
       db.prepare(`DELETE FROM dependencies WHERE filePath = ?`).run(filePath);
 
       const upsertDepsStmt = db.prepare(
-        `INSERT INTO dependencies (filePath, name) VALUES (?, ?)`,
+        `INSERT INTO dependencies (filePath, dependency, resolvedDependency) VALUES (?, ?, ?)`,
       );
       for (const dep of deps) {
-        upsertDepsStmt.run(filePath, dep);
+        if (dep !== '') {
+          try {
+            const resolved = resolver.resolveModule(filePath, dep);
+            upsertDepsStmt.run(filePath, dep, resolved);
+          } catch {
+            upsertDepsStmt.run(filePath, dep, null);
+          }
+        }
       }
     })();
   }
@@ -337,10 +354,17 @@ class SQLitePersistence implements Persistence {
 
   persist(
     cachePath: string,
+    config: Config.ProjectConfig,
     moduleMapData: SQLiteCache,
     filePersistenceData?: FilePersistenceData,
   ) {
     const db = this.getDatabase(cachePath);
+    const SQLModuleMap = require('../SQLModuleMap').default;
+    const hasteModuleMap = (new SQLModuleMap(
+      config.rootDir,
+      cachePath,
+    ) as any) as HasteMap.ModuleMap;
+    const resolver = Runtime.createResolver(config, hasteModuleMap);
 
     db.transaction(() => {
       if (filePersistenceData) {
@@ -381,7 +405,7 @@ class SQLitePersistence implements Persistence {
           `DELETE FROM dependencies WHERE filePath = ?`,
         );
         const upsertDepsStmt = db.prepare(
-          `INSERT OR REPLACE INTO dependencies (filePath, name) VALUES (?, ?)`,
+          `INSERT OR REPLACE INTO dependencies (filePath, dependency, resolvedDependency) VALUES (?, ?, ?)`,
         );
         for (const file of changedFiles) {
           runFileStmt(upsertFileStmt, file);
@@ -392,7 +416,14 @@ class SQLitePersistence implements Persistence {
 
           const deps = fileMetadata[H.DEPENDENCIES].split(H.DEPENDENCY_DELIM);
           for (const dep of deps) {
-            upsertDepsStmt.run(filePath, dep);
+            if (dep !== '') {
+              try {
+                const resolved = resolver.resolveModule(filePath, dep);
+                upsertDepsStmt.run(filePath, dep, resolved);
+              } catch {
+                upsertDepsStmt.run(filePath, dep, null);
+              }
+            }
           }
         }
       }
@@ -603,7 +634,7 @@ class SQLitePersistence implements Persistence {
     const results: Set<string> = new Set();
 
     const getFilesWithDepStmt = db.prepare(
-      `SELECT filePath FROM dependencies WHERE name = ?`,
+      `SELECT filePath FROM dependencies WHERE dependency = ?`,
     );
 
     for (const [filePath, fileMetadata] of fileData) {
@@ -623,6 +654,23 @@ class SQLitePersistence implements Persistence {
     }
 
     return Array.from(results);
+  }
+
+  resolveFileDependency(
+    cachePath: string,
+    filePath: string,
+    dependency: string,
+  ) {
+    // Get database, throw if does not exist.
+    const db = this.getDatabase(cachePath);
+
+    const resolvedDependency: string = db
+      .prepare(
+        `SELECT resolvedDependency FROM dependencies WHERE filePath = ? AND dependency = ?`,
+      )
+      .get(filePath, dependency);
+
+    return resolvedDependency;
   }
 
   private closeDatabase(cachePath: string): void {
@@ -668,7 +716,8 @@ class SQLitePersistence implements Persistence {
 
     db.exec(`CREATE TABLE IF NOT EXISTS dependencies(
       id text PRIMARY KEY,
-      name text NOT NULL,
+      dependency text NOT NULL,
+      resolvedDependency text,
       filePath text NOT NULL
     );`);
 

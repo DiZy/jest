@@ -121,7 +121,10 @@ export default class DefaultHasteFS implements HasteFS {
     );
   }
 
-  persist(filePersistenceData?: FilePersistenceData): void {
+  persist(
+    _config: Config.ProjectConfig,
+    filePersistenceData?: FilePersistenceData,
+  ): void {
     if (filePersistenceData) {
       try {
         this._hasteMap.files = filePersistenceData.finalFiles!;
@@ -134,7 +137,11 @@ export default class DefaultHasteFS implements HasteFS {
     FilePersistence.persist(this._cachePath, this._hasteMap);
   }
 
-  setFileMetadata(filePath: string, fileMetadata: FileMetaData): void {
+  setFileMetadata(
+    _config: Config.ProjectConfig,
+    filePath: string,
+    fileMetadata: FileMetaData,
+  ): void {
     const relativePath = this._convertToRelativePath(filePath);
     this._hasteMap.files.set(relativePath, fileMetadata);
   }
@@ -254,6 +261,13 @@ export default class DefaultHasteFS implements HasteFS {
       'getFilesWithDependencies: Method not supported for DefaultHasteFS',
     );
     return [];
+  }
+
+  resolveFileDependency(_file: Config.Path, _dependency: string): Config.Path {
+    throw new Error(
+      'resolveFileDependency: Method not supported for DefaultHasteFS',
+    );
+    return '';
   }
 
   private _convertToRelativePath(file: Config.Path): Config.Path {

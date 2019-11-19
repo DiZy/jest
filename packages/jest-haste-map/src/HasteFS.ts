@@ -23,7 +23,10 @@ export default interface HasteFS {
 
   createFilePersistenceData(fileCrawlData: FileCrawlData): FilePersistenceData;
 
-  persist(filePersistenceData?: FilePersistenceData): void;
+  persist(
+    config: Config.ProjectConfig,
+    filePersistenceData?: FilePersistenceData,
+  ): void;
 
   getModuleName: (file: Config.Path) => string | null;
 
@@ -45,7 +48,11 @@ export default interface HasteFS {
 
   getAbsoluteFileIterator: () => Iterable<Config.Path>;
 
-  setFileMetadata(filePath: string, fileMetadata: FileMetaData): void;
+  setFileMetadata(
+    config: Config.ProjectConfig,
+    filePath: string,
+    fileMetadata: FileMetaData,
+  ): void;
 
   deleteFileMetadata(filePath: string): void;
 
@@ -93,4 +100,6 @@ export default interface HasteFS {
   getAbsolutePathsOfFilesWithDependencies(
     files: Array<Config.Path>,
   ): Array<Config.Path>;
+
+  resolveFileDependency(file: Config.Path, dependency: string): Config.Path;
 }

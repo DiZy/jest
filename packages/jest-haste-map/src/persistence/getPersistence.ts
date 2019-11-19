@@ -9,11 +9,11 @@ export default function getPersistence(useSQLite: boolean) {
     try {
       require.resolve('better-sqlite3');
       chosenModule = require('./SQLitePersistence').default;
-    } catch {
-      throw new Error("better-sqlite3 is required for SQL mode");
+    } catch (e) {
+      console.log(e);
+      throw new Error('better-sqlite3 is required for SQL mode');
     }
-  }
-  else {
+  } else {
     chosenModule = require('./FilePersistence').default;
   }
 

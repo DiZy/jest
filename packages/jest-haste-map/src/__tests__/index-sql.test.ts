@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
 import {skipSuiteOnWindows} from '@jest/test-utils';
-import { tmpdir } from 'os';
+import {tmpdir} from 'os';
 import rimraf from 'rimraf';
 
 const testDirectory = path.resolve(tmpdir(), 'jest-index-sql-test');
@@ -25,15 +25,20 @@ function mockHashContents(contents) {
 
 // Needs to be mocked due to issues with better-sqlite3 in Jest
 jest.mock('../persistence/SQLitePersistence', () => {
-  const SQLitePersistence = jest.requireActual('../persistence/SQLitePersistence');
-  SQLitePersistence.default.findFilePathsBasedOnPattern = jest.fn((cachePath: string, pattern: string) => {
-    const allFiles = SQLitePersistence.default.readAllFiles(cachePath);
-    const filePaths: Array<string> = Array.from(allFiles.keys());
-    return filePaths.filter(file => 
-      SQLitePersistence.default.regexMatch(file, pattern) === 1);
-  });
+  const SQLitePersistence = jest.requireActual(
+    '../persistence/SQLitePersistence',
+  );
+  SQLitePersistence.default.findFilePathsBasedOnPattern = jest.fn(
+    (cachePath: string, pattern: string) => {
+      const allFiles = SQLitePersistence.default.readAllFiles(cachePath);
+      const filePaths: Array<string> = Array.from(allFiles.keys());
+      return filePaths.filter(
+        file => SQLitePersistence.default.regexMatch(file, pattern) === 1,
+      );
+    },
+  );
   return SQLitePersistence;
-})
+});
 
 jest.mock('child_process', () => ({
   // If this does not throw, we'll use the (mocked) watchman crawler
@@ -69,7 +74,11 @@ jest.mock('../crawlers/watchman', () =>
         if (list[file]) {
           const hash = computeSha1 ? mockHashContents(list[file]) : null;
 
-          changedFiles.set(relativeFilePath, {mtime : mockMTime, sha1: hash, size: 42});
+          changedFiles.set(relativeFilePath, {
+            mtime: mockMTime,
+            sha1: hash,
+            size: 42,
+          });
         } else {
           removedFiles.add(relativeFilePath);
         }
@@ -314,7 +323,7 @@ describe('HasteMap', () => {
       expect(hasteFS.matchFilesBasedOnRelativePath('/__mocks__/')).toEqual([
         '/project/fruits/__mocks__/Pear.js',
       ]);
-  }));
+    }));
 
   it('ignores files given a pattern', () => {
     const config = {...defaultConfig, ignorePattern: /Kiwi/};
@@ -464,7 +473,6 @@ describe('HasteMap', () => {
         const data = hasteMapBuildResults.__hasteMapForTest;
         const hasteFS = hasteMapBuildResults.hasteFS;
 
-
         expect(hasteFS.getAllFilesMap()).toEqual(
           createMap({
             'fruits/Banana.js': [
@@ -530,7 +538,10 @@ describe('HasteMap', () => {
 
     expect(data.map.get('IRequireAVideo')).toBeDefined();
     expect(hasteFS.getAllFilesMap().get('video/video.mp4')).toBeDefined();
-    expect(require('graceful-fs').readFileSync).not.toBeCalledWith('video/video.mp4', 'utf8');
+    expect(require('graceful-fs').readFileSync).not.toBeCalledWith(
+      'video/video.mp4',
+      'utf8',
+    );
   });
 
   it('retains all files if `retainAllFiles` is specified', () => {
@@ -576,7 +587,7 @@ describe('HasteMap', () => {
     })
       .build()
       .catch(() => {
-        const consoleError : any = console.error;
+        const consoleError: any = console.error;
         expect(consoleError.mock.calls[0][0]).toMatchSnapshot();
       });
   });
@@ -594,7 +605,7 @@ describe('HasteMap', () => {
         expect(
           data.map.get('Strawberry')[H.GENERIC_PLATFORM],
         ).not.toBeDefined();
-        const consoleWarn : any = console.warn;
+        const consoleWarn: any = console.warn;
         expect(consoleWarn.mock.calls[0][0]).toMatchSnapshot();
       });
   });
@@ -697,7 +708,9 @@ describe('HasteMap', () => {
           .build()
           .then(({__hasteMapForTest: data}) => {
             // The second time should not need to access the five files
-            expect(require('graceful-fs').readFileSync.mock.calls.length).toBe(0);
+            expect(require('graceful-fs').readFileSync.mock.calls.length).toBe(
+              0,
+            );
 
             expect(useBuitinsInContext(data.clocks)).toEqual(mockClocks);
             expect(useBuitinsInContext(data.files)).toEqual(initialData.files);
@@ -730,7 +743,9 @@ describe('HasteMap', () => {
         return new HasteMap(defaultConfig)
           .build()
           .then(({__hasteMapForTest: data, hasteFS}) => {
-            expect(require('graceful-fs').readFileSync.mock.calls.length).toBe(1);
+            expect(require('graceful-fs').readFileSync.mock.calls.length).toBe(
+              1,
+            );
             expect(require('graceful-fs').readFileSync).toBeCalledWith(
               '/project/fruits/Banana.js',
               'utf8',
@@ -1158,7 +1173,7 @@ describe('HasteMap', () => {
           }),
         );
 
-        const consoleWarn : any = console.warn;
+        const consoleWarn: any = console.warn;
         expect(consoleWarn.mock.calls[0][0]).toMatchSnapshot();
       });
   });
@@ -1225,7 +1240,7 @@ describe('HasteMap', () => {
   });
 
   describe('file system changes processing', () => {
-    function waitForItToChange(hasteMap) : Promise<any>{
+    function waitForItToChange(hasteMap): Promise<any> {
       return new Promise((resolve, reject) => {
         hasteMap.once('change', resolve);
       });
@@ -1370,8 +1385,12 @@ describe('HasteMap', () => {
             type: 'change',
           },
         ]);
-        expect(hasteFS.getModuleName('/project/fruits/Orange.ios.js')).toBeTruthy();
-        expect(hasteFS.getModuleName('/project/fruits/Orange.android.js')).toBeTruthy();
+        expect(
+          hasteFS.getModuleName('/project/fruits/Orange.ios.js'),
+        ).toBeTruthy();
+        expect(
+          hasteFS.getModuleName('/project/fruits/Orange.android.js'),
+        ).toBeTruthy();
         const iosVariant = moduleMap.getModule('Orange', 'ios');
         expect(iosVariant).toBe('/project/fruits/Orange.ios.js');
         const androidVariant = moduleMap.getModule('Orange', 'android');
